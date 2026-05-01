@@ -496,11 +496,12 @@ function App(){
   const theme=THEMES[platformKey]||THEMES.wb;
 
   useEffect(()=>{
-    const s=LS.get("wb_settings",null);
+    let s=LS.get("wb_settings",null);
     const r=LS.get("wb_reviews_local",[]);
     setReviews(r);
     if(!s){setScreen("setup");return;}
-    setSettings(s);setScreen("list");
+    if(s.tone==="neutral")s={...s,tone:"friendly"};
+    setSettings(s);LS.set("wb_settings",s);setScreen("list");
     fetch(API+"/api/feedback/stats").then(r=>r.json()).then(d=>{if(d.total)setFeedbackCount(d.total);}).catch(()=>{});
   },[]);
 
