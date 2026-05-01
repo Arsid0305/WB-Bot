@@ -1,0 +1,21 @@
+# Секреты
+.env
+.env.*
+!.env.example
+
+# Данные (не хранить в git)
+*.json
+!package.json
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+venv/
+*.egg-info/
+
+# OS
+.DS_Store
+Thumbs.db
