@@ -1,43 +1,47 @@
-name: Auto-merge
+name: Auto-merge feature branches
 
-# Цепочка: claude/* → dev → main
-# Каждый переход — только после успешного CI
+# Схема: любая ветка → dev (авто) → main (только после CI)
 on:
+  push:
+    branches-ignore:
+      - main
+      - dev
   workflow_run:
     workflows: ["CI"]
-    branches:
-      - dev
-      - "claude/**"
+    branches: [dev]
     types: [completed]
 
 jobs:
-  automerge:
+  automerge-to-dev:
     runs-on: ubuntu-latest
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
-
+    if: github.event_name == 'push'
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Configure git
+      - name: Merge into dev
         run: |
           git config user.email "actions@github.com"
           git config user.name "GitHub Actions"
           git fetch origin
-
-      - name: claude/* → dev
-        if: ${{ startsWith(github.event.workflow_run.head_branch, 'claude/') }}
-        run: |
-          BRANCH="${{ github.event.workflow_run.head_branch }}"
-          git checkout dev
-          git merge --no-ff origin/$BRANCH -m "Auto-merge $BRANCH into dev [CI passed]"
+          git checkout dev || git checkout -b dev
+          git merge --no-ff origin/${{ github.ref_name }} -m "Auto-merge ${{ github.ref_name }} into dev"
           git push origin dev
 
-      - name: dev → main
-        if: ${{ github.event.workflow_run.head_branch == 'dev' }}
+  automerge-to-main:
+    runs-on: ubuntu-latest
+    if: github.event.workflow_run.conclusion == 'success'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Merge dev into main
         run: |
+          git config user.email "actions@github.com"
+          git config user.name "GitHub Actions"
+          git fetch origin
           git checkout main
           git merge --no-ff origin/dev -m "Auto-merge dev into main [CI passed]"
           git push origin main
