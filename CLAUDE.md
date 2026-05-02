@@ -1,6 +1,41 @@
-# WB-Bot — ReviewBot
+# Контекст проекта для Claude — WB-Bot
 
-Бот для автоматической генерации ответов на отзывы покупателей на маркетплейсах Wildberries и Ozon с помощью OpenAI GPT и веб-интерфейса модерации.
+## ⛔ ГЛАВНОЕ ПРАВИЛО
+
+Никаких изменений без явного согласования с пользователем.
+Заметил баг или улучшение — сообщи и жди разрешения. Не трогай.
+
+**Claude вносит изменения ТОЛЬКО если:**
+1. Пользователь явно описал задачу
+2. Claude объяснил что именно будет менять
+3. Пользователь подтвердил («делай», «да», «ок» или аналог)
+
+**Запрещено:**
+- Менять логику, которую не обсуждали
+- «Заодно» исправлять что-то ещё
+- Откатывать или переписывать ранее сделанное без явной просьбы
+- Добавлять фичи, рефакторинг, «улучшения» по своей инициативе
+
+> В конце каждого чата — обновлять раздел «Открытые баги».
+
+---
+
+## Инфраструктура
+
+- Запуск: локально через `uvicorn` или Docker
+- Репо: github.com/Arsid0305/WB-Bot
+- Ветки: `main` (продакшн) → `dev` (интеграция) → `claude/*` (рабочие)
+- CI: GitHub Actions — pytest на каждый push/PR в `main` и `dev`
+- Автомерж: `dev → main` только после успешного CI
+
+## Стек
+
+- Python 3.11
+- FastAPI + Uvicorn + Jinja2
+- OpenAI API (генерация ответов)
+- Wildberries Feedbacks API
+- Ozon Seller API
+- pytest + httpx (тесты)
 
 ## Структура проекта
 
@@ -8,27 +43,26 @@
 WB-Bot/
 ├── web/
 │   ├── app.py              # FastAPI приложение (API + UI)
-│   ├── templates/
-│   │   └── queue.html      # Jinja2 шаблон очереди отзывов
-│   └── static/             # Статика (favicon, изображения)
+│   ├── templates/queue.html
+│   └── static/
 ├── connectors/
-│   ├── wb_connector.py     # Коннектор Wildberries Feedbacks API
-│   └── ozon_connector.py   # Коннектор Ozon Seller API
+│   ├── wb_connector.py     # Wildberries Feedbacks API
+│   └── ozon_connector.py   # Ozon Seller API
 ├── tests/
 │   ├── test_wb_connector.py
 │   ├── test_ozon_connector.py
 │   ├── test_app_utils.py
 │   └── test_api.py
 ├── .github/workflows/
-│   ├── ci.yml              # CI: тесты на push/PR
-│   └── automerge.yml       # Auto-merge dev→main после CI
+│   ├── ci.yml
+│   └── automerge.yml
 ├── requirements.txt
 ├── .env.example
 ├── Dockerfile
 └── docker-compose.yml
 ```
 
-Рантайм-файлы (`queue.json`, `approved_log.json`, `wb_feedback_history.json`) хранятся в корне проекта и не коммитятся.
+Рантайм-файлы (`queue.json`, `approved_log.json`, `wb_feedback_history.json`) — в корне, не коммитятся.
 
 ## Переменные окружения
 
@@ -40,53 +74,58 @@ WB-Bot/
 | `OPENAI_API_KEY_REVIEWBOT` | OpenAI API ключ |
 | `OPENAI_MODEL` | Модель OpenAI (по умолчанию `gpt-4o-mini`) |
 
-## Запуск
+## Среда Claude
 
-### Локально (Python)
-```bash
-pip install -r requirements.txt
-cp .env.example .env
-# Заполни .env реальными токенами
-uvicorn web.app:app --host 127.0.0.1 --port 8000
-```
+- Python 3.11 — есть
+- pip / venv — есть
+- Docker — есть
+- node_modules — не нужны
+- Supabase CLI — не используется
+- Установка зависимостей: `pip install -r requirements.txt`
 
-### Docker
-```bash
-cp .env.example .env
-# Заполни .env реальными токенами
-docker-compose up -d
-```
+## Рабочий процесс
 
-## Тесты
-```bash
-pip install -r requirements.txt
-pytest tests/ -v
-```
+1. Пользователь ставит задачу
+2. Claude объясняет план (коротко: что меняет и где)
+3. Пользователь говорит «делай»
+4. Claude делает — строго то, что обговорили
+5. Коммит + пуш в `claude/*` → PR в `dev`
+6. CI прогоняет тесты → автомерж в `main`
 
 ## API endpoints
 
 | Метод | Путь | Описание |
 |---|---|---|
-| GET | `/` | Главная страница (очередь отзывов) |
-| GET | `/api/wb/reviews` | Получить неотвеченные отзывы WB |
-| POST | `/api/wb/send` | Отправить ответ на отзыв WB |
+| GET | `/` | Очередь отзывов |
+| GET | `/api/wb/reviews` | Неотвеченные отзывы WB |
+| POST | `/api/wb/send` | Отправить ответ WB |
 | GET | `/api/wb/check-token` | Проверить WB токен |
-| GET | `/api/ozon/reviews` | Получить неотвеченные отзывы Ozon |
-| POST | `/api/ozon/send` | Отправить ответ на отзыв Ozon |
+| GET | `/api/ozon/reviews` | Неотвеченные отзывы Ozon |
+| POST | `/api/ozon/send` | Отправить ответ Ozon |
 | GET | `/api/ozon/check-token` | Проверить Ozon токен |
-| POST | `/api/generate` | Сгенерировать ответ через OpenAI |
-| POST | `/api/feedback` | Сохранить обратную связь по ответу |
+| POST | `/api/generate` | Сгенерировать ответ (OpenAI) |
+| POST | `/api/feedback` | Сохранить обратную связь |
 | GET | `/api/feedback/stats` | Статистика обратной связи |
-| POST | `/approve` | Одобрить ответ (отправить на маркетплейс) |
-| POST | `/reject` | Отклонить отзыв из очереди |
+| POST | `/approve` | Одобрить и отправить ответ |
+| POST | `/reject` | Отклонить отзыв |
 
-## Ветки
+## Запуск
 
-- `main` — продакшн
-- `dev` — интеграционная ветка (вливается в main через CI)
-- `claude/*` — рабочие ветки
+```bash
+# Локально
+pip install -r requirements.txt
+cp .env.example .env  # заполнить токены
+uvicorn web.app:app --host 127.0.0.1 --port 8000
 
-## CI/CD
+# Docker
+docker-compose up -d
 
-- `ci.yml` — запускает pytest на каждый push/PR в `main` и `dev`
-- `automerge.yml` — автоматически вливает `dev` → `main` после успешного CI
+# Тесты
+pytest tests/ -v
+```
+
+---
+
+## Открытые баги
+
+_(пусто)_
