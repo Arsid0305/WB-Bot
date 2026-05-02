@@ -1,0 +1,39 @@
+name: CI + Auto Merge
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  syntax-check:
+    name: Python Syntax Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: Check syntax
+        run: python -m compileall -q connectors/ web/
+
+  auto-merge:
+    name: Auto Merge PR
+    needs: syntax-check
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Squash and merge
+        run: |
+          gh pr merge "${{ github.event.pull_request.number }}" \
+            --squash \
+            --delete-branch \
+            --repo "${{ github.repository }}"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
