@@ -1,0 +1,12 @@
+services:
+  reviewbot:
+    build: .
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    volumes:
+      - ./queue.json:/app/queue.json
+      - ./approved_log.json:/app/approved_log.json
+      - ./wb_feedback_history.json:/app/wb_feedback_history.json
+    restart: unless-stopped
