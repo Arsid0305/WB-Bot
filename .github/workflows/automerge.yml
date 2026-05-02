@@ -1,16 +1,18 @@
-name: Auto-merge dev into main
+name: Auto-merge
 
-# Запускается только когда CI успешно завершился на ветке dev
+# Цепочка: claude/* → dev → main
+# Каждый переход — только после успешного CI
 on:
   workflow_run:
     workflows: ["CI"]
-    branches: [dev]
+    branches:
+      - dev
+      - "claude/**"
     types: [completed]
 
 jobs:
   automerge:
     runs-on: ubuntu-latest
-    # Только если CI прошёл успешно
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
 
     steps:
@@ -19,11 +21,23 @@ jobs:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Merge dev into main
+      - name: Configure git
         run: |
           git config user.email "actions@github.com"
           git config user.name "GitHub Actions"
           git fetch origin
+
+      - name: claude/* → dev
+        if: ${{ startsWith(github.event.workflow_run.head_branch, 'claude/') }}
+        run: |
+          BRANCH="${{ github.event.workflow_run.head_branch }}"
+          git checkout dev
+          git merge --no-ff origin/$BRANCH -m "Auto-merge $BRANCH into dev [CI passed]"
+          git push origin dev
+
+      - name: dev → main
+        if: ${{ github.event.workflow_run.head_branch == 'dev' }}
+        run: |
           git checkout main
           git merge --no-ff origin/dev -m "Auto-merge dev into main [CI passed]"
           git push origin main
