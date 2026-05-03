@@ -198,7 +198,7 @@ def index(request: Request, platform: str = None):
 @app.post("/approve")
 def approve(index: int = Form(...), edited_response: str = Form(...)):
     queue = load_queue()
-    if index >= len(queue):
+    if index < 0 or index >= len(queue):
         return RedirectResponse("/", status_code=303)
     item = queue.pop(index)
     final_response = edited_response.strip()
@@ -212,9 +212,10 @@ def approve(index: int = Form(...), edited_response: str = Form(...)):
 @app.post("/reject")
 def reject(index: int = Form(...)):
     queue = load_queue()
-    if index < len(queue):
-        queue.pop(index)
-        save_queue(queue)
+    if index < 0 or index >= len(queue):
+        return RedirectResponse("/", status_code=303)
+    queue.pop(index)
+    save_queue(queue)
     return RedirectResponse("/", status_code=303)
 
 
@@ -331,8 +332,6 @@ async def api_save_feedback(request: Request):
         history = history[-200:]
     save_feedback_history(history)
     return JSONResponse({"ok": True, "total": len(history)})
-
-
 
 
 # ======================
