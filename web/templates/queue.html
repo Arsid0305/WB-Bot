@@ -15,6 +15,7 @@ body {
 .wrapper {
     max-width: 900px;
     margin: 50px auto;
+    padding: 0 16px;
 }
 
 .tabs {
@@ -60,8 +61,18 @@ body {
 .ozon { background: linear-gradient(135deg, #0066ff, #0051cc); }
 
 .customer { font-size: 14px; color: #555; margin-bottom: 8px; }
-.product  { font-weight: 600; margin-bottom: 4px; }
-.sku-block { font-size: 13px; color: #666; margin-bottom: 12px; }
+.product  { font-weight: 600; margin-bottom: 6px; font-size: 16px; }
+
+.meta-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 18px;
+    font-size: 13px;
+    color: #666;
+    margin-bottom: 14px;
+}
+.meta-item { white-space: nowrap; }
+.meta-label { color: #999; margin-right: 3px; }
 
 .stars { font-size: 26px; margin-bottom: 14px; }
 .star-filled { display: inline-block; margin-right: 2px; color: #ffb84d; text-shadow: 0 1px 4px rgba(255,184,77,0.35); }
@@ -72,8 +83,45 @@ body {
     padding: 14px;
     border-radius: 10px;
     font-size: 15px;
-    margin-bottom: 16px;
+    margin-bottom: 14px;
     line-height: 1.5;
+}
+
+.photo-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 14px;
+}
+
+.photo-grid a {
+    display: block;
+    width: 80px;
+    height: 80px;
+    border-radius: 8px;
+    overflow: hidden;
+    border: 1px solid #e6e8ec;
+    flex-shrink: 0;
+}
+
+.photo-grid img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.video-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    color: #4a89f3;
+    text-decoration: none;
+    margin-bottom: 14px;
+    padding: 6px 12px;
+    background: #f0f5ff;
+    border-radius: 8px;
 }
 
 textarea {
@@ -112,7 +160,6 @@ button {
 <body>
 <div class="wrapper">
 
-<!-- Вкладки -->
 <div class="tabs">
     <a href="/?platform=wb"
        class="tab tab-wb {% if active_platform == 'wb' %}active{% endif %}">
@@ -135,12 +182,31 @@ button {
         {{ item.review.platform | upper }}
     </div>
 
+    {% if item.review.author %}
     <div class="customer">{{ item.review.author }}</div>
+    {% endif %}
 
     <div class="product">{{ item.review.productName }}</div>
 
-    <div class="sku-block">
-        Артикул: {{ item.review.article }} | Дата: {{ item.review.date }}
+    <div class="meta-grid">
+        {% if item.review.article %}
+        <span class="meta-item"><span class="meta-label">Арт. WB:</span>{{ item.review.article }}</span>
+        {% endif %}
+        {% if item.review.supplierArticle and item.review.supplierArticle != '—' %}
+        <span class="meta-item"><span class="meta-label">Арт. продавца:</span>{{ item.review.supplierArticle }}</span>
+        {% endif %}
+        {% if item.review.color %}
+        <span class="meta-item"><span class="meta-label">Цвет:</span>{{ item.review.color }}</span>
+        {% endif %}
+        {% if item.review.size %}
+        <span class="meta-item"><span class="meta-label">Размер:</span>{{ item.review.size }}</span>
+        {% endif %}
+        {% if item.review.date %}
+        <span class="meta-item"><span class="meta-label">Отзыв:</span>{{ item.review.date }}</span>
+        {% endif %}
+        {% if item.review.orderDate %}
+        <span class="meta-item"><span class="meta-label">Заказ:</span>{{ item.review.orderDate }}</span>
+        {% endif %}
     </div>
 
     {% set stars = item.review.stars | int %}
@@ -159,7 +225,22 @@ button {
         {% if item.review.comment %}<b>Комментарий:</b> {{ item.review.comment }}{% endif %}
     </div>
 
-    <!-- Одобрить -->
+    {% if item.review.photos %}
+    <div class="photo-grid">
+        {% for photo_url in item.review.photos %}
+        <a href="{{ photo_url }}" target="_blank" rel="noopener">
+            <img src="{{ photo_url }}" alt="Фото" loading="lazy">
+        </a>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if item.review.videoUrl %}
+    <a class="video-link" href="{{ item.review.videoUrl }}" target="_blank" rel="noopener">
+        ▶ Видео от покупателя
+    </a>
+    {% endif %}
+
     <form method="post" action="/approve">
         <input type="hidden" name="index" value="{{ loop.index0 }}">
         <textarea name="edited_response">{{ item.response }}</textarea>
@@ -168,13 +249,11 @@ button {
         </div>
     </form>
 
-    <!-- Перегенерировать -->
     <form method="post" action="/regenerate" style="display:inline">
         <input type="hidden" name="index" value="{{ loop.index0 }}">
         <button class="regen-btn" type="submit">↻ Перегенерировать</button>
     </form>
 
-    <!-- Отклонить -->
     <form method="post" action="/reject" style="display:inline">
         <input type="hidden" name="index" value="{{ loop.index0 }}">
         <button class="reject-btn" type="submit">✕ Удалить</button>
