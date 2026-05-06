@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Env
+.env
+*.env
+
+# Data files (contain customer data)
+wb_feedback_history.json
+queue.json
+approved_log.json
+
+# Venv
+venv/
+.venv/
+env/
+
+# IDE
+.vscode/
+.idea/
