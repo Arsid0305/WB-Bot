@@ -31,7 +31,7 @@ app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://127.0.0.1:8000", "http://localhost:8000"],
+    allow_origins=["*"],
     allow_credentials=False,
     allow_methods=["GET", "POST"],
     allow_headers=["Content-Type"],
@@ -39,8 +39,6 @@ app.add_middleware(
 
 templates = Jinja2Templates(directory=str(_APP_DIR / "templates"))
 app.mount("/static", StaticFiles(directory=str(_APP_DIR / "static")), name="static")
-
-SIGNATURE = "\n\nС уважением,\nкоманда Arols"
 
 # connectors лежат в WB_BOT/connectors/
 sys.path.insert(0, str(_BOT_DIR))
@@ -202,8 +200,6 @@ def approve(index: int = Form(...), edited_response: str = Form(...)):
         return RedirectResponse("/", status_code=303)
     item = queue.pop(index)
     final_response = edited_response.strip()
-    if SIGNATURE.strip() not in final_response:
-        final_response += SIGNATURE
     log_approved(item, final_response)
     save_queue(queue)
     return RedirectResponse("/", status_code=303)
