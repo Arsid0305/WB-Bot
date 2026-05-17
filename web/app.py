@@ -282,11 +282,11 @@ async def api_generate(request: Request):
         if provider == "gemini":
             from openai import OpenAI
             client = OpenAI(
-                api_key=os.getenv("GEMINI_API_KEY"),
+                api_key=os.getenv("GOOGLE_API_KEY_REVIEWBOT"),
                 base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
             )
             resp = client.chat.completions.create(
-                model=model or "gemini-2.0-flash",
+                model=model or os.getenv("GEMINI_MODEL", "gemini-2.0-flash"),
                 max_tokens=500,
                 temperature=0.7,
                 messages=[
@@ -300,7 +300,7 @@ async def api_generate(request: Request):
             import anthropic
             client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
             resp = client.messages.create(
-                model=model or "claude-haiku-4-5-20251001",
+                model=model or os.getenv("ANTHROPIC_MODEL", "claude-haiku-4-5-20251001"),
                 max_tokens=500,
                 system=system_prompt,
                 messages=[{"role": "user", "content": user_prompt}],
