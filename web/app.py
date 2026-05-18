@@ -326,6 +326,23 @@ async def api_generate(request: Request):
             )
             text = resp.content[0].text.strip()
 
+        elif provider == "deepseek":
+            from openai import OpenAI
+            client = OpenAI(
+                api_key=os.getenv("DEEPSEEK_API_KEY"),
+                base_url="https://api.deepseek.com",
+            )
+            resp = client.chat.completions.create(
+                model=model or os.getenv("DEEPSEEK_MODEL", "deepseek-chat"),
+                max_tokens=800,
+                temperature=0.7,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user",   "content": user_prompt},
+                ],
+            )
+            text = resp.choices[0].message.content.strip()
+
         else:  # openai (default)
             from openai import OpenAI
             client = OpenAI(api_key=os.getenv("OPENAI_API_KEY_REVIEWBOT"))
