@@ -298,7 +298,7 @@ async def api_generate(request: Request):
             )
             resp = client.chat.completions.create(
                 model=model or os.getenv("GEMINI_MODEL", "gemini-2.5-flash"),
-                max_tokens=500,
+                max_tokens=800,
                 temperature=0.7,
                 messages=[
                     {"role": "system", "content": system_prompt},
@@ -312,7 +312,7 @@ async def api_generate(request: Request):
             client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY_REVIEWBOT"))
             resp = client.messages.create(
                 model=model or os.getenv("ANTHROPIC_MODEL", "claude-haiku-4-5-20251001"),
-                max_tokens=500,
+                max_tokens=800,
                 system=system_prompt,
                 messages=[{"role": "user", "content": user_prompt}],
             )
@@ -323,7 +323,7 @@ async def api_generate(request: Request):
             client = OpenAI(api_key=os.getenv("OPENAI_API_KEY_REVIEWBOT"))
             resp = client.chat.completions.create(
                 model=model or os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
-                max_tokens=500,
+                max_tokens=800,
                 temperature=0.7,
                 messages=[
                     {"role": "system", "content": system_prompt},
