@@ -14,9 +14,9 @@ cd /d C:\DATA\PROJECTS\WB-Bot
 call venv\Scripts\activate.bat
 
 echo  Обновление из GitHub...
-del /f /q "%CD%\ReviewBot.ico" 2>nul
+git fetch origin main --quiet 2>nul
+git checkout origin/main -- ReviewBot.ico 2>nul
 git pull origin main --quiet && echo   OK || echo   Нет интернета, работаем с локальной версией
-git checkout ReviewBot.ico 2>nul
 
 powershell -NoProfile -Command "$d=[Environment]::GetFolderPath('Desktop');$lnk=$d+'\ReviewBot WB.lnk';$s=(New-Object -COM WScript.Shell).CreateShortcut($lnk);$s.TargetPath='%CD%\ReviewBot.bat';$s.IconLocation='%CD%\ReviewBot.ico,0';$s.WorkingDirectory='%CD%';$s.Save()" 2>nul
 
