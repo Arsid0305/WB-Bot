@@ -6,6 +6,7 @@ import json
 import os
 import re
 import sys
+import requests
 from datetime import datetime
 from pathlib import Path
 from dotenv import load_dotenv
@@ -35,8 +36,6 @@ app.mount("/static", StaticFiles(directory=str(_APP_DIR / "static")), name="stat
 
 SIGNATURE = "\n\nС уважением,\nкоманда Arols"
 
-sys.path.insert(0, str(_BOT_DIR))
-
 
 
 def load_feedback_history():
@@ -49,10 +48,9 @@ def load_feedback_history():
 
 
 def save_feedback_history(data):
-    FEEDBACK_FILE.write_text(
-        json.dumps(data, ensure_ascii=False, indent=2),
-        encoding="utf-8"
-    )
+    tmp = FEEDBACK_FILE.with_suffix(".tmp")
+    tmp.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+    tmp.replace(FEEDBACK_FILE)
 
 
 
@@ -162,13 +160,15 @@ def api_get_reviews(take: int = 100, skip: int = 0):
         from connectors.wb_connector import get_unanswered_feedbacks
         reviews = get_unanswered_feedbacks(take=take, skip=skip)
         return JSONResponse({"ok": True, "reviews": reviews, "count": len(reviews)})
-    except Exception as e:
-        msg = str(e)
-        if "401" in msg:
+    except requests.HTTPError as e:
+        code = e.response.status_code if e.response is not None else 0
+        if code == 401:
             return JSONResponse({"ok": False, "error": "WB токен недействителен"}, status_code=401)
-        if "403" in msg:
+        if code == 403:
             return JSONResponse({"ok": False, "error": "Нет доступа к WB Feedbacks API"}, status_code=403)
-        return JSONResponse({"ok": False, "error": msg}, status_code=502)
+        return JSONResponse({"ok": False, "error": str(e)}, status_code=502)
+    except Exception as e:
+        return JSONResponse({"ok": False, "error": str(e)}, status_code=502)
 
 
 @app.post("/api/wb/send")
@@ -186,11 +186,13 @@ async def api_send_reply(request: Request):
         from connectors.wb_connector import send_reply
         send_reply(feedback_id, text)
         return JSONResponse({"ok": True})
-    except Exception as e:
-        msg = str(e)
-        if "401" in msg:
+    except requests.HTTPError as e:
+        code = e.response.status_code if e.response is not None else 0
+        if code == 401:
             return JSONResponse({"ok": False, "error": "WB токен недействителен"}, status_code=401)
-        return JSONResponse({"ok": False, "error": msg}, status_code=502)
+        return JSONResponse({"ok": False, "error": str(e)}, status_code=502)
+    except Exception as e:
+        return JSONResponse({"ok": False, "error": str(e)}, status_code=502)
 
 
 @app.post("/api/generate")

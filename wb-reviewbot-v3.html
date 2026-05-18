@@ -263,7 +263,7 @@ function MainScreen({reviews,loading,platformError,onRefresh,onOpenSettings,feed
   const providerLabel=PROVIDERS[settings?.provider]?.label||"AI";
   const providerColor=PROVIDERS[settings?.provider]?.color||"#10A37F";
 
-  const filtered=reviews.filter(r=>r.platform===t.platform||r.source==="manual");
+  const filtered=reviews.filter(r=>r.platform===t.platform);
   const pending=filtered.filter(r=>r.status!=="responded");
   const done=filtered.filter(r=>r.status==="responded");
   const activeReview=reviews.find(r=>r.id===activeId)||null;
