@@ -368,10 +368,6 @@ def api_ozon_get_reviews(take: int = 100, skip: int = 0):
         return JSONResponse({"ok": True, "reviews": reviews, "count": len(reviews)})
     except Exception as e:
         msg = str(e)
-        if "401" in msg:
-            return JSONResponse({"ok": False, "error": "Ozon токен недействителен"}, status_code=401)
-        if "403" in msg:
-            return JSONResponse({"ok": False, "error": "Нет доступа к Ozon API"}, status_code=403)
         return JSONResponse({"ok": False, "error": msg}, status_code=502)
 
 
