@@ -5,33 +5,30 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 import json
 import os
+import re
 import sys
 from datetime import datetime
 from pathlib import Path
 from dotenv import load_dotenv
 load_dotenv()
 
-# ======================
-# ПУТИ — всегда абсолютные от расположения app.py
-# ======================
-
-_APP_DIR  = Path(__file__).resolve().parent        # .../WB_BOT/web/
-_BOT_DIR  = _APP_DIR.parent                        # .../WB_BOT/
-_DATA_DIR = _BOT_DIR                               # данные хранятся в WB_BOT/
+_APP_DIR  = Path(__file__).resolve().parent
+_BOT_DIR  = _APP_DIR.parent
+_DATA_DIR = _BOT_DIR
 
 QUEUE_FILE    = _DATA_DIR / "queue.json"
 LOG_FILE      = _DATA_DIR / "approved_log.json"
 FEEDBACK_FILE = _DATA_DIR / "wb_feedback_history.json"
 
-# ======================
-# INIT
-# ======================
-
 app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://127.0.0.1:8000", "http://localhost:8000"],
+    allow_origins=[
+        "http://127.0.0.1:8000",
+        "http://localhost:8000",
+        "null",  # file:// protocol sends Origin: null
+    ],
     allow_credentials=False,
     allow_methods=["GET", "POST"],
     allow_headers=["Content-Type"],
@@ -42,12 +39,8 @@ app.mount("/static", StaticFiles(directory=str(_APP_DIR / "static")), name="stat
 
 SIGNATURE = "\n\nС уважением,\nкоманда Arols"
 
-# connectors лежат в WB_BOT/connectors/
 sys.path.insert(0, str(_BOT_DIR))
 
-# ======================
-# UTILS
-# ======================
 
 def load_queue():
     if not QUEUE_FILE.exists():
@@ -110,13 +103,12 @@ def build_review_text(review: dict) -> str:
 
 def extract_first_name(full_name: str) -> str:
     if not full_name or not full_name.strip():
-        return "Покупатель"
+        return ""
     parts = full_name.strip().split()
     first = parts[0]
-    import re
     if re.match(r'^[А-ЯЁA-Z][а-яёa-z]{1,14}$', first):
         return first
-    return "Покупатель"
+    return ""
 
 
 def build_system_prompt(settings: dict, feedback_history: list) -> str:
@@ -147,11 +139,11 @@ def build_system_prompt(settings: dict, feedback_history: list) -> str:
 - Тон: {tone}
 - Длина: {length}
 - Подпись: «{sign}»
-{f"- Инструкции: {extra}" if extra else ""}
+{f'- Инструкции: {extra}' if extra else ''}
 
 ПРАВИЛА:
 1. ВСЕГДА органично упоминай название товара в тексте ответа
-2. Если известно имя покупателя — обращайся по имени в начале. Если имя неизвестно (пусто или "Покупатель") — НЕ используй       никакого обращения, начинай ответ сразу по сути.
+2. Если известно имя покупателя — обращайсь по имени в начале. Если имя неизвестно (пусто) — НЕ используй никакого обращения, начинай ответ сразу по сути.
 3. Только русский язык
 4. Максимум 1000 символов (жёсткий лимит WB)
 5. Негатив (1-2★): признай проблему, извинись, предложи написать в ЛС для решения
@@ -175,10 +167,6 @@ def build_system_prompt(settings: dict, feedback_history: list) -> str:
     p += "\n\nОтвечай ТОЛЬКО текстом ответа, без кавычек и пояснений."
     return p
 
-
-# ======================
-# МАРШРУТЫ
-# ======================
 
 @app.get("/")
 def index(request: Request, platform: str = None):
@@ -223,10 +211,6 @@ def reject(index: int = Form(...)):
 def favicon():
     return FileResponse(str(_APP_DIR / "static" / "favicon.ico"))
 
-
-# ======================
-# API — WB
-# ======================
 
 @app.get("/api/wb/check-token")
 def api_check_token():
@@ -280,38 +264,71 @@ async def api_generate(request: Request):
     review   = body.get("review", {})
     settings = body.get("settings", {})
 
-    review_text = build_review_text(review)
-    first_name  = extract_first_name(review.get("author", ""))
+    review_text      = build_review_text(review)
+    first_name       = extract_first_name(review.get("author", ""))
     feedback_history = load_feedback_history()
-
-    system_prompt = build_system_prompt(settings, feedback_history)
+    system_prompt    = build_system_prompt(settings, feedback_history)
     user_prompt = (
         f"Товар: «{review.get('productName', '—')}» (арт. {review.get('article', '—')})\n"
         f"Оценка: {review.get('stars', 0)} из 5★\n"
-        f"Имя покупателя: {review.get('author', '—')} → обращайся: «{first_name}»\n"
+        f"Имя покупателя: {review.get('author', '—')} → обращайсь: «{first_name or 'без обращения'}»\n"
         f"{review_text}"
     )
 
+    provider = settings.get("provider", "openai")
+    model    = settings.get("model", "")
+
     try:
-        from openai import OpenAI
-        client = OpenAI(api_key=os.getenv("OPENAI_API_KEY_REVIEWBOT"))
-        resp = client.chat.completions.create(
-            model=settings.get("model", os.getenv("OPENAI_MODEL", "gpt-4o-mini")),
-            max_tokens=500,
-            temperature=0.7,
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user",   "content": user_prompt},
-            ],
-        )
-        text = resp.choices[0].message.content.strip()
+        if provider == "gemini":
+            from openai import OpenAI
+            client = OpenAI(
+                api_key=os.getenv("GOOGLE_API_KEY_REVIEWBOT"),
+                base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
+            )
+            resp = client.chat.completions.create(
+                model=model or os.getenv("GEMINI_MODEL", "gemini-2.0-flash"),
+                max_tokens=500,
+                temperature=0.7,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user",   "content": user_prompt},
+                ],
+            )
+            text = resp.choices[0].message.content.strip()
+
+        elif provider == "anthropic":
+            import anthropic
+            client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+            resp = client.messages.create(
+                model=model or os.getenv("ANTHROPIC_MODEL", "claude-haiku-4-5-20251001"),
+                max_tokens=500,
+                system=system_prompt,
+                messages=[{"role": "user", "content": user_prompt}],
+            )
+            text = resp.content[0].text.strip()
+
+        else:  # openai (default)
+            from openai import OpenAI
+            client = OpenAI(api_key=os.getenv("OPENAI_API_KEY_REVIEWBOT"))
+            resp = client.chat.completions.create(
+                model=model or os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
+                max_tokens=500,
+                temperature=0.7,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user",   "content": user_prompt},
+                ],
+            )
+            text = resp.choices[0].message.content.strip()
+
         return JSONResponse({"ok": True, "text": text})
+
     except Exception as e:
         msg = str(e)
-        if "401" in msg or "Incorrect API key" in msg:
-            return JSONResponse({"ok": False, "error": "Неверный OpenAI API-ключ"}, status_code=401)
+        if "401" in msg or "Incorrect API key" in msg or "invalid_api_key" in msg:
+            return JSONResponse({"ok": False, "error": f"Неверный API-ключ ({provider})"}, status_code=401)
         if "insufficient_quota" in msg:
-            return JSONResponse({"ok": False, "error": "Недостаточно средств на счёте OpenAI"}, status_code=402)
+            return JSONResponse({"ok": False, "error": "Недостаточно средств на счёте"}, status_code=402)
         return JSONResponse({"ok": False, "error": msg}, status_code=500)
 
 
@@ -333,10 +350,6 @@ async def api_save_feedback(request: Request):
     save_feedback_history(history)
     return JSONResponse({"ok": True, "total": len(history)})
 
-
-# ======================
-# API — OZON
-# ======================
 
 @app.get("/api/ozon/check-token")
 def api_ozon_check_token():
@@ -380,6 +393,47 @@ async def api_ozon_send_reply(request: Request):
         if "401" in msg:
             return JSONResponse({"ok": False, "error": "Ozon токен недействителен"}, status_code=401)
         return JSONResponse({"ok": False, "error": msg}, status_code=502)
+
+
+@app.post("/regenerate")
+def regenerate(index: int = Form(...)):
+    queue = load_queue()
+    if index < 0 or index >= len(queue):
+        return RedirectResponse("/", status_code=303)
+
+    item   = queue[index]
+    review = item.get("review", {})
+    first_name = extract_first_name(review.get("author", ""))
+    feedback_history = load_feedback_history()
+
+    default_settings = {"brandName": "Наш бренд", "tone": "friendly", "responseLength": "medium", "signature": ""}
+    system_prompt = build_system_prompt(default_settings, feedback_history)
+    user_prompt = (
+        f"Товар: «{review.get('productName', '—')}» (арт. {review.get('article', '—')})\n"
+        f"Оценка: {review.get('stars', 0)} из 5★\n"
+        f"Имя покупателя: {review.get('author', '—')} → обращайся: «{first_name}»\n"
+        f"{build_review_text(review)}"
+    )
+
+    try:
+        from openai import OpenAI
+        client = OpenAI(api_key=os.getenv("OPENAI_API_KEY_REVIEWBOT"))
+        resp = client.chat.completions.create(
+            model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
+            max_tokens=500,
+            temperature=0.7,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user",   "content": user_prompt},
+            ],
+        )
+        queue[index]["response"] = resp.choices[0].message.content.strip()
+        save_queue(queue)
+    except Exception:
+        pass
+
+    return RedirectResponse("/", status_code=303)
+
 
 @app.get("/api/feedback/stats")
 def api_feedback_stats():

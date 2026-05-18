@@ -1,16 +1,15 @@
-name: Auto-merge feature branches
+name: Auto-merge to main
 
 on:
   push:
-    branches-ignore:
-      - main
-      - dev
+    branches:
+      - 'claude/**'
 
 permissions:
   contents: write
 
 jobs:
-  automerge-to-dev:
+  merge-to-main:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -18,11 +17,18 @@ jobs:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Merge into dev
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Syntax check
+        run: python -m compileall . -q
+
+      - name: Merge into main
         run: |
           git config user.email "actions@github.com"
           git config user.name "GitHub Actions"
-          git fetch origin dev
-          git checkout -B dev origin/dev
-          git merge --no-ff origin/${{ github.ref_name }} -m "Auto-merge ${{ github.ref_name }} into dev"
-          git push origin dev
+          git fetch origin main
+          git checkout -B main origin/main
+          git merge --no-ff origin/${{ github.ref_name }} -m "Auto-merge ${{ github.ref_name }} into main"
+          git push origin main

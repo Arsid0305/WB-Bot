@@ -4,7 +4,7 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>ReviewBot</title>
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='14' fill='%23a500ff'/><text x='32' y='44' font-size='36' text-anchor='middle' fill='white'>💬</text></svg>">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='14' fill='%23a500ff'/><text x='32' y='44' font-size='36' text-anchor='middle' fill='white'>&#x1F4AC;</text></svg>">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
@@ -33,30 +33,21 @@ const LS = {
 
 const TONE_LABELS   = {formal:"Официальный",friendly:"Дружелюбный",neutral:"Нейтральный"};
 const LENGTH_LABELS = {short:"Короткий (до 200 зн.)",medium:"Средний (до 500 зн.)",long:"Развёрнутый (до 900 зн.)"};
-const MODEL_LABELS  = {"gpt-4o-mini":"GPT-4o mini — быстро, дёшево","gpt-4o":"GPT-4o — выше качество"};
+
+const PROVIDERS = {
+  openai:    {label:"OpenAI",   color:"#10A37F", models:{"gpt-4o-mini":"GPT-4o mini — быстро, дёшево (~$0.0002/ответ)","gpt-4o":"GPT-4o — выше качество (~$0.003/ответ)"}, defaultModel:"gpt-4o-mini"},
+  gemini:    {label:"Gemini",   color:"#4285F4", models:{"gemini-2.0-flash":"Gemini 2.0 Flash — дешевле в 2×, отличный RU (~$0.0001/ответ)"}, defaultModel:"gemini-2.0-flash"},
+  anthropic: {label:"Claude",   color:"#D97706", models:{"claude-sonnet-4-6":"Claude Sonnet 4.6 — мощный и точный (~$0.0009/ответ)","claude-haiku-4-5-20251001":"Claude Haiku 4.5 — быстро и дёшево (~$0.0001/ответ)"}, defaultModel:"claude-sonnet-4-6"},
+};
 
 const THEMES = {
   wb: {
-    grad:    "linear-gradient(135deg, #a500ff, #7b00ff)",
-    accent:  "#a500ff",
-    accentBg:"rgba(165,0,255,0.06)",
-    accentShadow:"rgba(165,0,255,0.12)",
-    name:    "WB",
-    loadLabel:"↓ Загрузить отзывы с WB",
-    apiPath: "/api/wb/reviews",
-    sendPath:"/api/wb/send",
-    platform:"wb",
+    grad:"linear-gradient(135deg, #a500ff, #7b00ff)",accent:"#a500ff",accentBg:"rgba(165,0,255,0.06)",accentShadow:"rgba(165,0,255,0.12)",
+    name:"WB",loadLabel:"↓ Загрузить отзывы с WB",apiPath:"/api/wb/reviews",sendPath:"/api/wb/send",platform:"wb",
   },
   ozon: {
-    grad:    "linear-gradient(135deg, #005BFF, #0041CC)",
-    accent:  "#005BFF",
-    accentBg:"rgba(0,91,255,0.06)",
-    accentShadow:"rgba(0,91,255,0.12)",
-    name:    "OZON",
-    loadLabel:"↓ Загрузить отзывы с Ozon",
-    apiPath: "/api/ozon/reviews",
-    sendPath:"/api/ozon/send",
-    platform:"ozon",
+    grad:"linear-gradient(135deg, #005BFF, #0041CC)",accent:"#005BFF",accentBg:"rgba(0,91,255,0.06)",accentShadow:"rgba(0,91,255,0.12)",
+    name:"OZON",loadLabel:"↓ Загрузить отзывы с Ozon",apiPath:"/api/ozon/reviews",sendPath:"/api/ozon/send",platform:"ozon",
   },
 };
 
@@ -75,9 +66,8 @@ async function apiFetch(path,opts={}){
   return data;
 }
 
-// ── Иконки ──
 const IcoStar=({filled,size=22})=>(
-  <span style={{fontSize:size,color:filled?"#ffb84d":"#e6e6e6",textShadow:filled?"0 1px 4px rgba(255,184,77,0.35)":"none",lineHeight:1,display:"inline-block"}}>★</span>
+  <span style={{fontSize:size,color:filled?"#ffb84d":"#e6e6e6",textShadow:filled?"0 1px 4px rgba(255,184,77,0.35)":"none",lineHeight:1,display:"inline-block"}}>&#9733;</span>
 );
 const IcoSparkle=()=>(<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6z"/></svg>);
 const IcoSettings=()=>(<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>);
@@ -104,7 +94,6 @@ function PrimBtn({onClick,disabled,children,grad}){
   return<button onClick={onClick} disabled={disabled} style={{padding:"13px 20px",background:disabled?"#e6e8ec":grad,color:disabled?"#999":"#fff",border:"none",borderRadius:10,fontSize:15,fontWeight:600,cursor:disabled?"not-allowed":"pointer",transition:"all 0.2s",display:"flex",alignItems:"center",justifyContent:"center",gap:8,width:"100%"}}>{children}</button>;
 }
 
-// Переключатель платформы
 function PlatformSwitch({current,onChange}){
   return(
     <div style={{display:"flex",background:"rgba(255,255,255,0.15)",borderRadius:12,padding:4,gap:4}}>
@@ -120,14 +109,12 @@ function PlatformSwitch({current,onChange}){
   );
 }
 
-// ══════════════════════════════════════════════════════════
-// НАСТРОЙКИ
-// ══════════════════════════════════════════════════════════
 function SetupScreen({initial,isEdit,onSave,onBack,theme}){
   const t=theme||THEMES.wb;
-  const[form,setForm]=useState(initial||{brandName:"",tone:"friendly",responseLength:"medium",model:"gpt-4o-mini",signature:"",customInstructions:""});
+  const[form,setForm]=useState(initial||{brandName:"",tone:"friendly",responseLength:"medium",provider:"openai",model:"gpt-4o-mini",signature:"",customInstructions:""});
   const set=(k,v)=>setForm(f=>({...f,[k]:v}));
   const valid=form.brandName.trim().length>0;
+  const activeProv=PROVIDERS[form.provider]||PROVIDERS.openai;
   return(
     <div style={{minHeight:"100vh",background:"#f5f6f8"}}>
       <div style={{background:t.grad,padding:"0 24px",display:"flex",alignItems:"center",gap:12}}>
@@ -139,8 +126,7 @@ function SetupScreen({initial,isEdit,onSave,onBack,theme}){
           <div>
             <label style={lbl}>Название бренда <span style={{color:t.accent}}>*</span></label>
             <input style={inp} placeholder="Organic Lab" value={form.brandName} onChange={e=>set("brandName",e.target.value)}
-              onFocus={e=>{e.target.style.borderColor=t.accent;e.target.style.boxShadow=`0 0 0 3px ${t.accentBg}`;}}
-              onBlur={e=>{e.target.style.borderColor="#d9dbe0";e.target.style.boxShadow="none";}}/>
+              onFocus={e=>{e.target.style.borderColor=t.accent;e.target.style.boxShadow=`0 0 0 3px ${t.accentBg}`;}} onBlur={e=>{e.target.style.borderColor="#d9dbe0";e.target.style.boxShadow="none";}}/>
           </div>
           <div>
             <label style={lbl}>Тон</label>
@@ -159,25 +145,36 @@ function SetupScreen({initial,isEdit,onSave,onBack,theme}){
             </div>
           </div>
           <div>
-            <label style={lbl}>Модель GPT</label>
-            <div style={{display:"flex",flexDirection:"column",gap:8}}>
-              {Object.entries(MODEL_LABELS).map(([k,v])=>(
-                <button key={k} onClick={()=>set("model",k)} style={{padding:"10px 16px",borderRadius:10,border:`2px solid ${form.model===k?"#10A37F":"#e6e8ec"}`,background:form.model===k?"rgba(16,163,127,0.06)":"#fff",color:form.model===k?"#10A37F":"#333",fontSize:14,fontWeight:form.model===k?600:400,cursor:"pointer",textAlign:"left"}}>{v}</button>
+            <label style={lbl}>Провайдер ИИ</label>
+            <div style={{display:"flex",gap:8}}>
+              {Object.entries(PROVIDERS).map(([k,p])=>(
+                <button key={k} onClick={()=>{set("provider",k);set("model",p.defaultModel);}}
+                  style={{flex:1,padding:"9px 4px",borderRadius:10,border:`2px solid ${form.provider===k?p.color:"#e6e8ec"}`,background:form.provider===k?`${p.color}18`:"#fff",color:form.provider===k?p.color:"#333",fontSize:13,fontWeight:form.provider===k?600:400,cursor:"pointer"}}>
+                  {p.label}
+                </button>
               ))}
             </div>
-            <div style={{fontSize:12,color:"#999",marginTop:6}}>mini: ~$0.0002 за ответ · 4o: ~$0.003 за ответ</div>
+          </div>
+          <div>
+            <label style={lbl}>Модель</label>
+            <div style={{display:"flex",flexDirection:"column",gap:8}}>
+              {Object.entries(activeProv.models).map(([k,v])=>(
+                <button key={k} onClick={()=>set("model",k)}
+                  style={{padding:"10px 16px",borderRadius:10,border:`2px solid ${form.model===k?activeProv.color:"#e6e8ec"}`,background:form.model===k?`${activeProv.color}18`:"#fff",color:form.model===k?activeProv.color:"#333",fontSize:14,fontWeight:form.model===k?600:400,cursor:"pointer",textAlign:"left"}}>
+                  {v}
+                </button>
+              ))}
+            </div>
           </div>
           <div>
             <label style={lbl}>Подпись</label>
             <input style={inp} placeholder={`С уважением, команда ${form.brandName||"бренда"}`} value={form.signature} onChange={e=>set("signature",e.target.value)}
-              onFocus={e=>{e.target.style.borderColor=t.accent;e.target.style.boxShadow=`0 0 0 3px ${t.accentBg}`;}}
-              onBlur={e=>{e.target.style.borderColor="#d9dbe0";e.target.style.boxShadow="none";}}/>
+              onFocus={e=>{e.target.style.borderColor=t.accent;e.target.style.boxShadow=`0 0 0 3px ${t.accentBg}`;}} onBlur={e=>{e.target.style.borderColor="#d9dbe0";e.target.style.boxShadow="none";}}/>
           </div>
           <div>
             <label style={lbl}>Доп. инструкции</label>
             <textarea style={{...inp,height:90,lineHeight:1.6,resize:"vertical"}} placeholder="Например: при браке — предлагать замену..." value={form.customInstructions} onChange={e=>set("customInstructions",e.target.value)}
-              onFocus={e=>{e.target.style.borderColor=t.accent;e.target.style.boxShadow=`0 0 0 3px ${t.accentBg}`;}}
-              onBlur={e=>{e.target.style.borderColor="#d9dbe0";e.target.style.boxShadow="none";}}/>
+              onFocus={e=>{e.target.style.borderColor=t.accent;e.target.style.boxShadow=`0 0 0 3px ${t.accentBg}`;}} onBlur={e=>{e.target.style.borderColor="#d9dbe0";e.target.style.boxShadow="none";}}/>
           </div>
           <PrimBtn onClick={()=>valid&&onSave(form)} disabled={!valid} grad={t.grad}>{isEdit?"Сохранить":"Начать работу →"}</PrimBtn>
         </div>
@@ -186,9 +183,6 @@ function SetupScreen({initial,isEdit,onSave,onBack,theme}){
   );
 }
 
-// ══════════════════════════════════════════════════════════
-// МОДАЛ: Добавить вручную
-// ══════════════════════════════════════════════════════════
 function AddReviewModal({onClose,onAdd,theme}){
   const t=theme||THEMES.wb;
   const[form,setForm]=useState({productName:"",article:"",author:"",stars:0,pros:"",cons:"",comment:""});
@@ -216,7 +210,7 @@ function AddReviewModal({onClose,onAdd,theme}){
           </div>
           <div style={{background:"#fafafa",borderRadius:12,padding:"16px 18px",border:"1px solid #f0f0f5"}}>
             <div style={{fontSize:12,fontWeight:700,color:"#999",textTransform:"uppercase",letterSpacing:"0.07em",marginBottom:12}}>Покупатель</div>
-            <div><label style={lbl}>Имя</label><input style={inp} placeholder="Мария К." value={form.author} onChange={e=>set("author",e.target.value)}/><div style={{fontSize:12,color:"#999",marginTop:4}}>Обращение: <strong style={{color:"#1a1a1a"}}>{extractFirstName(form.author)}</strong></div></div>
+            <div><label style={lbl}>Имя</label><input style={inp} placeholder="Мария К." value={form.author} onChange={e=>set("author",e.target.value)}/><div style={{fontSize:12,color:"#999",marginTop:4}}>Обращение: <strong style={{color:"#1a1a1a"}}>{extractFirstName(form.author)||"(без обращения)"}</strong></div></div>
             <div style={{marginTop:14}}>
               <label style={lbl}>Оценка <span style={{color:t.accent}}>*</span></label>
               <div style={{display:"flex",alignItems:"center",gap:12}}>
@@ -230,7 +224,7 @@ function AddReviewModal({onClose,onAdd,theme}){
             <div style={{display:"flex",flexDirection:"column",gap:12}}>
               <div><label style={lbl}><span style={{color:"#34C759"}}>✓</span> Достоинства</label><textarea style={{...inp,height:76,lineHeight:1.6,resize:"vertical"}} placeholder="Что понравилось..." value={form.pros} onChange={e=>set("pros",e.target.value)}/></div>
               <div><label style={lbl}><span style={{color:"#FF3B30"}}>✕</span> Недостатки</label><textarea style={{...inp,height:76,lineHeight:1.6,resize:"vertical"}} placeholder="Что не понравилось..." value={form.cons} onChange={e=>set("cons",e.target.value)}/></div>
-              <div><label style={lbl}>💬 Комментарий</label><textarea style={{...inp,height:76,lineHeight:1.6,resize:"vertical"}} placeholder="Дополнительный комментарий..." value={form.comment} onChange={e=>set("comment",e.target.value)}/></div>
+              <div><label style={lbl}>Комментарий</label><textarea style={{...inp,height:76,lineHeight:1.6,resize:"vertical"}} placeholder="Дополнительный комментарий..." value={form.comment} onChange={e=>set("comment",e.target.value)}/></div>
             </div>
             {form.stars>0&&!form.pros&&!form.cons&&!form.comment&&<div style={{marginTop:10,padding:"9px 13px",background:"#FFF8E1",border:"1px solid rgba(255,184,0,0.2)",borderRadius:8,fontSize:13,color:"#7A5F00"}}>⚠️ Только оценка — ответ не потребуется</div>}
           </div>
@@ -241,9 +235,6 @@ function AddReviewModal({onClose,onAdd,theme}){
   );
 }
 
-// ══════════════════════════════════════════════════════════
-// СПИСОК ОТЗЫВОВ
-// ══════════════════════════════════════════════════════════
 function ReviewList({reviews,loading,platformError,onSelect,onDelete,onRefresh,onOpenSettings,feedbackCount,theme,onSwitchPlatform}){
   const t=theme||THEMES.wb;
   const[showAdd,setShowAdd]=useState(false);
@@ -253,7 +244,6 @@ function ReviewList({reviews,loading,platformError,onSelect,onDelete,onRefresh,o
 
   const ReviewCard=({r,clickable})=>{
     const noContent=!hasContent(r);
-    const rt=THEMES[r.platform]||t;
     return(
       <div style={{...CARD,padding:24,marginBottom:20,cursor:clickable&&!noContent?"pointer":"default",transition:"box-shadow 0.15s,transform 0.15s"}}
         onClick={()=>clickable&&!noContent&&onSelect(r)}
@@ -309,7 +299,6 @@ function ReviewList({reviews,loading,platformError,onSelect,onDelete,onRefresh,o
           <button onClick={onOpenSettings} style={{background:"rgba(255,255,255,0.15)",border:"none",borderRadius:8,padding:"8px 10px",color:"#fff",cursor:"pointer",display:"flex"}}><IcoSettings/></button>
         </div>
       </div>
-
       <div style={{maxWidth:700,margin:"0 auto",padding:"28px 20px"}}>
         <div style={{display:"flex",gap:12,marginBottom:24}}>
           <button onClick={onRefresh} disabled={loading}
@@ -323,9 +312,7 @@ function ReviewList({reviews,loading,platformError,onSelect,onDelete,onRefresh,o
             <IcoPlus/>Вручную
           </button>
         </div>
-
         {platformError&&<div style={{padding:"12px 16px",background:"#FFF0F0",border:"1px solid #FFD0D0",borderRadius:10,fontSize:14,color:"#c0392b",marginBottom:20}}>⚠️ {platformError}</div>}
-
         {pending.length>0&&(
           <div>
             <div style={{fontSize:12,fontWeight:700,color:"#999",letterSpacing:"0.08em",textTransform:"uppercase",marginBottom:14}}>
@@ -334,14 +321,12 @@ function ReviewList({reviews,loading,platformError,onSelect,onDelete,onRefresh,o
             {pending.map(r=><ReviewCard key={r.id} r={r} clickable={true}/>)}
           </div>
         )}
-
         {done.length>0&&(
           <div style={{marginTop:8}}>
             <div style={{fontSize:12,fontWeight:700,color:"#999",letterSpacing:"0.08em",textTransform:"uppercase",marginBottom:14}}>Отвечено · {done.length}</div>
             {done.map(r=><ReviewCard key={r.id} r={r} clickable={false}/>)}
           </div>
         )}
-
         {pending.length===0&&done.length===0&&!loading&&(
           <div style={{textAlign:"center",padding:"60px 20px",color:"#999"}}>
             <div style={{fontSize:44,marginBottom:14}}>📭</div>
@@ -355,9 +340,6 @@ function ReviewList({reviews,loading,platformError,onSelect,onDelete,onRefresh,o
   );
 }
 
-// ══════════════════════════════════════════════════════════
-// ЭКРАН ОТВЕТА
-// ══════════════════════════════════════════════════════════
 function RespondScreen({review,settings,onBack,onSubmit,theme}){
   const t=theme||THEMES[review.platform]||THEMES.wb;
   const[response,setResponse]=useState("");
@@ -374,6 +356,8 @@ function RespondScreen({review,settings,onBack,onSubmit,theme}){
   const MAX=1000;
   const firstName=extractFirstName(review.author);
   const charColor=response.length>900?"#FF3B30":response.length>700?"#FF9500":"#999";
+  const providerLabel=PROVIDERS[settings?.provider]?.label||"AI";
+  const providerColor=PROVIDERS[settings?.provider]?.color||"#10A37F";
 
   const handleGenerate=async()=>{
     setGenerating(true);setError(null);setShowRating(false);setRating(0);setRatingNote("");
@@ -417,9 +401,8 @@ function RespondScreen({review,settings,onBack,onSubmit,theme}){
       <div style={{background:t.grad,padding:"0 24px",display:"flex",alignItems:"center",gap:12}}>
         <button onClick={onBack} style={{background:"none",border:"none",color:"#fff",cursor:"pointer",padding:"16px 4px",display:"flex"}}><IcoBack/></button>
         <span style={{color:"#fff",fontWeight:700,fontSize:16}}>Ответ на отзыв</span>
-        <span style={{background:"rgba(255,255,255,0.2)",color:"#fff",borderRadius:20,padding:"3px 12px",fontSize:12,marginLeft:"auto"}}>{t.name} API</span>
+        <span style={{background:"rgba(255,255,255,0.2)",color:"#fff",borderRadius:20,padding:"3px 12px",fontSize:12,marginLeft:"auto"}}>{providerLabel}</span>
       </div>
-
       <div style={{maxWidth:700,margin:"0 auto",padding:"28px 20px",display:"flex",flexDirection:"column",gap:16}}>
         <div style={{...CARD,padding:24}}>
           <PlatformBadge platform={review.platform||t.platform}/>
@@ -431,21 +414,20 @@ function RespondScreen({review,settings,onBack,onSubmit,theme}){
           {review.cons&&<div style={{background:"#f9fafc",padding:"12px 16px",borderRadius:10,fontSize:15,marginBottom:10,lineHeight:1.6}}><div style={{fontSize:12,fontWeight:700,color:"#FF3B30",marginBottom:4,textTransform:"uppercase",letterSpacing:"0.05em"}}>Недостатки</div>{review.cons}</div>}
           {review.comment&&<div style={{background:"#f9fafc",padding:"12px 16px",borderRadius:10,fontSize:15,lineHeight:1.6}}><div style={{fontSize:12,fontWeight:700,color:"#888",marginBottom:4,textTransform:"uppercase",letterSpacing:"0.05em"}}>Комментарий</div>{review.comment}</div>}
         </div>
-
         <div style={{...CARD,overflow:"hidden"}}>
           <div style={{padding:"16px 24px",borderBottom:"1px solid #f0f0f5",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
             <div>
               <div style={{fontWeight:700,fontSize:15,color:"#1a1a1a"}}>Ответ продавца</div>
-              <div style={{fontSize:13,color:"#888",marginTop:2}}>{firstName ? <>Обращение: <strong style={{color:t.accent}}>{firstName}</strong></> : <span style={{color:"#bbb"}}>Имя неизвестно — без обращения</span>}</div>
+              <div style={{fontSize:13,color:"#888",marginTop:2}}>{firstName?<>Обращение: <strong style={{color:t.accent}}>{firstName}</strong></>:<span style={{color:"#bbb"}}>Имя неизвестно — без обращения</span>}</div>
             </div>
             <button onClick={handleGenerate} disabled={generating}
-              style={{display:"flex",alignItems:"center",gap:7,padding:"9px 18px",background:generating?"#f0f1f4":"#10A37F",color:generating?"#999":"#fff",border:"none",borderRadius:10,fontSize:14,fontWeight:600,cursor:generating?"not-allowed":"pointer",transition:"all 0.15s"}}>
-              {generating?<><span style={{display:"inline-block",animation:"spin 1s linear infinite"}}>⟳</span>Генерирую...</>:<><IcoSparkle/>{generated?"Перегенерировать":"Сгенерировать ИИ"}</>}
+              style={{display:"flex",alignItems:"center",gap:7,padding:"9px 18px",background:generating?"#f0f1f4":providerColor,color:generating?"#999":"#fff",border:"none",borderRadius:10,fontSize:14,fontWeight:600,cursor:generating?"not-allowed":"pointer",transition:"all 0.15s"}}>
+              {generating?<><span style={{display:"inline-block",animation:"spin 1s linear infinite"}}>⟳</span>Генерирую...</>:<><IcoSparkle/>{generated?"Перегенерировать":`Сгенерировать (${providerLabel})`}</>}
             </button>
           </div>
           <div style={{padding:"0 24px"}}>
             <textarea ref={taRef} value={response} onChange={e=>e.target.value.length<=MAX&&setResponse(e.target.value)}
-              placeholder="Напишите ответ вручную или нажмите «Сгенерировать ИИ»..."
+              placeholder="Напишите ответ вручную или нажмите «Сгенерировать»..."
               style={{width:"100%",minHeight:150,border:"none",outline:"none",resize:"none",fontSize:15,color:"#1a1a1a",lineHeight:1.6,padding:"16px 0",background:"transparent",fontFamily:"inherit"}}/>
           </div>
           <div style={{padding:"0 24px 16px",display:"flex",justifyContent:"space-between"}}>
@@ -454,7 +436,6 @@ function RespondScreen({review,settings,onBack,onSubmit,theme}){
           </div>
           {error&&<div style={{margin:"0 24px 16px",padding:"11px 16px",background:"#FFF0F0",border:"1px solid #FFD0D0",borderRadius:8,fontSize:14,color:"#c0392b"}}>{error}</div>}
         </div>
-
         {showRating&&(
           <div style={{...CARD,padding:24,animation:"fadeIn 0.3s ease"}}>
             <div style={{fontSize:15,fontWeight:600,color:"#1a1a1a",marginBottom:14}}>🎓 Оцените ответ — бот учится на ваших оценках</div>
@@ -467,10 +448,10 @@ function RespondScreen({review,settings,onBack,onSubmit,theme}){
               ))}
               {rating>0&&<span style={{alignSelf:"center",fontSize:14,color:"#888",marginLeft:8}}>{rating<=2?"Плохо":rating===3?"Нормально":rating===4?"Хорошо":"Отлично!"}</span>}
             </div>
-            {rating>0&&rating<=3&&<input style={inp} placeholder="Что не так? (помогает боту улучшиться)" value={ratingNote} onChange={e=>setRatingNote(e.target.value)}/>}
+            {rating>0&&rating<=3&&<input style={inp} placeholder="Что не так? (помогает боту улучшиться)" value={ratingNote} onChange={e=>setRatingNote(e.target.value)}/>
+            }
           </div>
         )}
-
         <PrimBtn onClick={handleSubmit} disabled={!response.trim()||response.length>MAX||sending} grad={t.grad}>
           {sending?<><span style={{display:"inline-block",animation:"spin 1s linear infinite"}}>⟳</span>Отправляю...</>:<><IcoCheck/>{review.source!=="manual"?`Отправить на ${t.name}`:"Сохранить ответ"}</>}
         </PrimBtn>
@@ -479,9 +460,6 @@ function RespondScreen({review,settings,onBack,onSubmit,theme}){
   );
 }
 
-// ══════════════════════════════════════════════════════════
-// ROOT
-// ══════════════════════════════════════════════════════════
 function App(){
   const[screen,setScreen]=useState("loading");
   const[settings,setSettings]=useState(null);
@@ -500,17 +478,13 @@ function App(){
     const r=LS.get("wb_reviews_local",[]);
     setReviews(r);
     if(!s){setScreen("setup");return;}
-    setSettings(s);setScreen("list");
+    const migrated=s.provider?s:{...s,provider:"openai"};
+    setSettings(migrated);setScreen("list");
     fetch(API+"/api/feedback/stats").then(r=>r.json()).then(d=>{if(d.total)setFeedbackCount(d.total);}).catch(()=>{});
   },[]);
 
   const handleSaveSettings=(s)=>{setSettings(s);LS.set("wb_settings",s);setEditSettings(false);setScreen("list");};
-
-  const handleSwitchPlatform=(p)=>{
-    setPlatformKey(p);
-    LS.set("active_platform",p);
-    setPlatformError(null);
-  };
+  const handleSwitchPlatform=(p)=>{setPlatformKey(p);LS.set("active_platform",p);setPlatformError(null);};
 
   const handleRefresh=async()=>{
     setLoading(true);setPlatformError(null);
