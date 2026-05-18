@@ -238,7 +238,26 @@ function MainScreen({reviews,loading,platformError,onRefresh,onOpenSettings,feed
   const[sendingId,setSendingId]=useState(null);
   const[sendErrors,setSendErrors]=useState({});
   const[showAdd,setShowAdd]=useState(false);
+  const[ratings,setRatings]=useState({});
   const genStopRef=useRef(false);
+
+  const setRating=(id,field,val)=>setRatings(prev=>({...prev,[id]:{...prev[id],[field]:val,saved:false}}));
+  const saveFeedback=async(review,ratingOverride)=>{
+    const rb=ratings[review.id]||{};
+    const rating=ratingOverride??rb.rating;
+    if(!rating)return;
+    const parts=[];
+    if(review.pros)parts.push(review.pros);
+    if(review.cons)parts.push(review.cons);
+    if(review.comment)parts.push(review.comment);
+    try{
+      await apiFetch("/api/feedback",{method:"POST",body:JSON.stringify({
+        reviewText:parts.join(" | "),response:drafts[review.id]||"",
+        stars:review.stars,rating:rating,note:rb.note||"",
+      })});
+      setRatings(prev=>({...prev,[review.id]:{...prev[review.id],saved:true}}));
+    }catch(e){/* silent */}
+  };
 
   const providerLabel=PROVIDERS[settings?.provider]?.label||"AI";
   const providerColor=PROVIDERS[settings?.provider]?.color||"#10A37F";
@@ -432,6 +451,35 @@ function MainScreen({reviews,loading,platformError,onRefresh,onOpenSettings,feed
             <span style={{fontSize:13,color:charColor,fontVariantNumeric:"tabular-nums",fontWeight:draft.length>900?600:400}}>{draft.length} / {MAX}</span>
           </div>
           {genError&&<div style={{margin:"0 24px 16px",padding:"11px 16px",background:"#FFF0F0",border:"1px solid #FFD0D0",borderRadius:8,fontSize:14,color:"#c0392b"}}>{genError}</div>}
+          {draft&&(()=>{
+            const fb=ratings[r.id]||{};
+            const starColor=(n)=>n<=(fb.rating||0)?(fb.rating<=2?"#FF3B30":fb.rating<=3?"#FF9500":"#34C759"):"#d9dbe0";
+            return(
+              <div style={{margin:"0 24px 16px",padding:"14px 16px",background:"#f9fafc",borderRadius:10,border:"1px solid #f0f0f5"}}>
+                <div style={{fontSize:12,fontWeight:700,color:"#888",marginBottom:10,textTransform:"uppercase",letterSpacing:"0.06em"}}>Оцените качество ответа</div>
+                <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:fb.rating>0?10:0}}>
+                  {[1,2,3,4,5].map(n=>(
+                    <button key={n} onClick={()=>{
+                      setRating(r.id,"rating",n);
+                      if(n>=4)saveFeedback(r,n);
+                    }}
+                      style={{background:"none",border:"none",cursor:"pointer",padding:2,lineHeight:1,fontSize:26,color:starColor(n),transition:"color 0.1s"}}>★</button>
+                  ))}
+                  {fb.saved&&<span style={{fontSize:13,color:"#34C759",fontWeight:600,marginLeft:4}}>✓ Сохранено</span>}
+                </div>
+                {fb.rating>0&&fb.rating<=3&&(
+                  <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                    <input value={fb.note||""} onChange={e=>setRating(r.id,"note",e.target.value)}
+                      placeholder="Что не так? (фраза, стиль, логика...)"
+                      style={{width:"100%",padding:"7px 10px",border:"1.5px solid #e6e8ec",borderRadius:8,fontSize:13,color:"#1a1a1a",background:"#fff",fontFamily:"inherit"}}/>
+                    <button onClick={()=>saveFeedback(r)} style={{alignSelf:"flex-start",padding:"6px 16px",background:"#FF9500",color:"#fff",border:"none",borderRadius:8,fontSize:13,fontWeight:600,cursor:"pointer"}}>
+                      Сохранить замечание
+                    </button>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
         </div>
       </div>
     );
