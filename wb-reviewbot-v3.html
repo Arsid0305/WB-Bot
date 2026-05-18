@@ -36,7 +36,7 @@ const LENGTH_LABELS = {short:"Короткий (до 200 зн.)",medium:"Сре�
 
 const PROVIDERS = {
   openai:    {label:"OpenAI",   color:"#10A37F", models:{"gpt-4o-mini":"GPT-4o mini — быстро, дёшево (~$0.0002/ответ)","gpt-4o":"GPT-4o — выше качество (~$0.003/ответ)"}, defaultModel:"gpt-4o-mini"},
-  gemini:    {label:"Gemini",   color:"#4285F4", models:{"gemini-2.0-flash":"Gemini 2.0 Flash — дешевле в 2×, отличный RU (~$0.0001/ответ)"}, defaultModel:"gemini-2.0-flash"},
+  gemini:    {label:"Gemini",   color:"#4285F4", models:{"gemini-2.5-flash":"Gemini 2.5 Flash — дешевле в 2×, отличный RU (~$0.0001/ответ)"}, defaultModel:"gemini-2.5-flash"},
   anthropic: {label:"Claude",   color:"#D97706", models:{"claude-sonnet-4-6":"Claude Sonnet 4.6 — мощный и точный (~$0.0009/ответ)","claude-haiku-4-5-20251001":"Claude Haiku 4.5 — быстро и дёшево (~$0.0001/ответ)"}, defaultModel:"claude-sonnet-4-6"},
 };
 
@@ -69,8 +69,8 @@ const IcoPlus=()=>(<svg width="16" height="16" viewBox="0 0 24 24" fill="none" s
 const IcoTrash=()=>(<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6M9 6V4h6v2"/></svg>);
 const IcoSend=()=>(<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>);
 
-const inp={width:"100%",padding:"12px 14px",border:"1.5px solid #d9dbe0",borderRadius:10,fontSize:15,color:"#1a1a1a",background:"#fafafa",transition:"all 0.15s",fontFamily:"inherit"};
-const lbl={display:"block",fontSize:13,fontWeight:600,color:"#444",marginBottom:6};
+const inp={width:"100%",padding:"8px 12px",border:"1.5px solid #d9dbe0",borderRadius:8,fontSize:14,color:"#1a1a1a",background:"#fafafa",transition:"all 0.15s",fontFamily:"inherit"};
+const lbl={display:"block",fontSize:12,fontWeight:600,color:"#444",marginBottom:3};
 
 function Stars({count,size=22}){return<span style={{display:"flex",gap:2}}>{[1,2,3,4,5].map(i=><IcoStar key={i} filled={i<=count} size={size}/>)}</span>;}
 function StarPicker({value,onChange,size=28}){
@@ -114,8 +114,8 @@ function SetupScreen({initial,isEdit,onSave,onBack,theme}){
         {isEdit&&<button onClick={onBack} style={{background:"none",border:"none",color:"#fff",cursor:"pointer",padding:"16px 4px",display:"flex"}}><IcoBack/></button>}
         <span style={{color:"#fff",fontWeight:700,fontSize:16,padding:"16px 0"}}>{isEdit?"Настройки бренда":"Настройка бота"}</span>
       </div>
-      <div style={{padding:24,maxWidth:520,margin:"0 auto"}}>
-        <div style={{...CARD,padding:28,display:"flex",flexDirection:"column",gap:20}}>
+      <div style={{padding:"10px 16px",maxWidth:520,margin:"0 auto"}}>
+        <div style={{...CARD,padding:16,display:"flex",flexDirection:"column",gap:10}}>
           <div>
             <label style={lbl}>Название бренда <span style={{color:t.accent}}>*</span></label>
             <input style={inp} placeholder="Organic Lab" value={form.brandName} onChange={e=>set("brandName",e.target.value)}
@@ -125,15 +125,15 @@ function SetupScreen({initial,isEdit,onSave,onBack,theme}){
             <label style={lbl}>Тон</label>
             <div style={{display:"flex",gap:8}}>
               {Object.entries(TONE_LABELS).map(([k,v])=>(
-                <button key={k} onClick={()=>set("tone",k)} style={{flex:1,padding:"9px 4px",borderRadius:10,border:`2px solid ${form.tone===k?t.accent:"#e6e8ec"}`,background:form.tone===k?t.accentBg:"#fff",color:form.tone===k?t.accent:"#333",fontSize:13,fontWeight:form.tone===k?600:400,cursor:"pointer"}}>{v}</button>
+                <button key={k} onClick={()=>set("tone",k)} style={{flex:1,padding:"6px 4px",borderRadius:8,border:`2px solid ${form.tone===k?t.accent:"#e6e8ec"}`,background:form.tone===k?t.accentBg:"#fff",color:form.tone===k?t.accent:"#333",fontSize:13,fontWeight:form.tone===k?600:400,cursor:"pointer"}}>{v}</button>
               ))}
             </div>
           </div>
           <div>
             <label style={lbl}>Длина ответа</label>
-            <div style={{display:"flex",flexDirection:"column",gap:8}}>
+            <div style={{display:"flex",flexDirection:"column",gap:5}}>
               {Object.entries(LENGTH_LABELS).map(([k,v])=>(
-                <button key={k} onClick={()=>set("responseLength",k)} style={{padding:"10px 16px",borderRadius:10,border:`2px solid ${form.responseLength===k?t.accent:"#e6e8ec"}`,background:form.responseLength===k?t.accentBg:"#fff",color:form.responseLength===k?t.accent:"#333",fontSize:14,fontWeight:form.responseLength===k?600:400,cursor:"pointer",textAlign:"left"}}>{v}</button>
+                <button key={k} onClick={()=>set("responseLength",k)} style={{padding:"6px 12px",borderRadius:8,border:`2px solid ${form.responseLength===k?t.accent:"#e6e8ec"}`,background:form.responseLength===k?t.accentBg:"#fff",color:form.responseLength===k?t.accent:"#333",fontSize:13,fontWeight:form.responseLength===k?600:400,cursor:"pointer",textAlign:"left"}}>{v}</button>
               ))}
             </div>
           </div>
@@ -142,7 +142,7 @@ function SetupScreen({initial,isEdit,onSave,onBack,theme}){
             <div style={{display:"flex",gap:8}}>
               {Object.entries(PROVIDERS).map(([k,p])=>(
                 <button key={k} onClick={()=>{set("provider",k);set("model",p.defaultModel);}}
-                  style={{flex:1,padding:"9px 4px",borderRadius:10,border:`2px solid ${form.provider===k?p.color:"#e6e8ec"}`,background:form.provider===k?`${p.color}18`:"#fff",color:form.provider===k?p.color:"#333",fontSize:13,fontWeight:form.provider===k?600:400,cursor:"pointer"}}>
+                  style={{flex:1,padding:"6px 4px",borderRadius:8,border:`2px solid ${form.provider===k?p.color:"#e6e8ec"}`,background:form.provider===k?`${p.color}18`:"#fff",color:form.provider===k?p.color:"#333",fontSize:13,fontWeight:form.provider===k?600:400,cursor:"pointer"}}>
                   {p.label}
                 </button>
               ))}
@@ -150,10 +150,10 @@ function SetupScreen({initial,isEdit,onSave,onBack,theme}){
           </div>
           <div>
             <label style={lbl}>Модель</label>
-            <div style={{display:"flex",flexDirection:"column",gap:8}}>
+            <div style={{display:"flex",flexDirection:"column",gap:5}}>
               {Object.entries(activeProv.models).map(([k,v])=>(
                 <button key={k} onClick={()=>set("model",k)}
-                  style={{padding:"10px 16px",borderRadius:10,border:`2px solid ${form.model===k?activeProv.color:"#e6e8ec"}`,background:form.model===k?`${activeProv.color}18`:"#fff",color:form.model===k?activeProv.color:"#333",fontSize:14,fontWeight:form.model===k?600:400,cursor:"pointer",textAlign:"left"}}>
+                  style={{padding:"6px 12px",borderRadius:8,border:`2px solid ${form.model===k?activeProv.color:"#e6e8ec"}`,background:form.model===k?`${activeProv.color}18`:"#fff",color:form.model===k?activeProv.color:"#333",fontSize:13,fontWeight:form.model===k?600:400,cursor:"pointer",textAlign:"left"}}>
                   {v}
                 </button>
               ))}
@@ -166,7 +166,7 @@ function SetupScreen({initial,isEdit,onSave,onBack,theme}){
           </div>
           <div>
             <label style={lbl}>Доп. инструкции</label>
-            <textarea style={{...inp,height:90,lineHeight:1.6,resize:"vertical"}} placeholder="Например: при браке — предлагать замену..." value={form.customInstructions} onChange={e=>set("customInstructions",e.target.value)}
+            <textarea style={{...inp,height:60,lineHeight:1.5,resize:"vertical"}} placeholder="Например: при браке — предлагать замену..." value={form.customInstructions} onChange={e=>set("customInstructions",e.target.value)}
               onFocus={e=>{e.target.style.borderColor=t.accent;e.target.style.boxShadow=`0 0 0 3px ${t.accentBg}`;}} onBlur={e=>{e.target.style.borderColor="#d9dbe0";e.target.style.boxShadow="none";}}/>
           </div>
           <PrimBtn onClick={()=>valid&&onSave(form)} disabled={!valid} grad={t.grad}>{isEdit?"Сохранить":"Начать работу →"}</PrimBtn>
