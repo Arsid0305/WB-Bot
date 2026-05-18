@@ -279,9 +279,9 @@ async def api_generate(request: Request):
 
     stars = review.get("stars", 5)
     effective_settings = dict(settings)
-    if stars <= 2:
+    if stars <= 3:
         effective_settings["responseLength"] = "long"
-    elif stars == 3 and settings.get("responseLength") == "short":
+    else:
         effective_settings["responseLength"] = "medium"
 
     system_prompt    = build_system_prompt(effective_settings, feedback_history)
