@@ -276,7 +276,15 @@ async def api_generate(request: Request):
     review_text      = build_review_text(review)
     first_name       = extract_first_name(review.get("author", ""))
     feedback_history = load_feedback_history()
-    system_prompt    = build_system_prompt(settings, feedback_history)
+
+    stars = review.get("stars", 5)
+    effective_settings = dict(settings)
+    if stars <= 2:
+        effective_settings["responseLength"] = "long"
+    elif stars == 3 and settings.get("responseLength") == "short":
+        effective_settings["responseLength"] = "medium"
+
+    system_prompt    = build_system_prompt(effective_settings, feedback_history)
     user_prompt = (
         f"Товар: «{review.get('productName', '—')}» (арт. {review.get('article', '—')})\n"
         f"Оценка: {review.get('stars', 0)} из 5★\n"
