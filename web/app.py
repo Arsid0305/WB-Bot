@@ -93,6 +93,15 @@ def log_approved(item, final_response):
     )
 
 
+def append_signature(text: str, signature: str) -> str:
+    # Strip any signature the model might have added anyway
+    text = re.sub(
+        r'\s*(С уважением|Искренне ваш[а]?|Команда\s+\S+)[^\n]*$',
+        '', text, flags=re.IGNORECASE
+    ).rstrip()
+    return text + "\n" + signature
+
+
 def build_review_text(review: dict) -> str:
     parts = []
     if review.get("pros"):    parts.append(f"Достоинства: {review['pros']}")
@@ -138,21 +147,21 @@ def build_system_prompt(settings: dict, feedback_history: list) -> str:
 - Бренд: «{brand}»
 - Тон: {tone}
 - Длина: {length}
-- Подпись: «{sign}»
 {f'- Инструкции: {extra}' if extra else ''}
 
 ПРАВИЛА:
 1. ВСЕГДА органично упоминай название товара в тексте ответа
 2. Если известно имя покупателя — обращайсь по имени в начале. Если имя неизвестно (пусто) — НЕ используй никакого обращения, начинай ответ сразу по сути.
 3. Только русский язык
-4. Максимум 1000 символов (жёсткий лимит WB)
+4. Максимум 900 символов (подпись добавится автоматически)
 5. Негатив (1-2★): признай проблему, извинись, предложи написать в ЛС для решения
 6. Позитив (4-5★): поблагодари, выдели конкретную деталь из отзыва
 7. Нейтраль (3★): поблагодари за честную оценку, ответь на конкретное замечание
 8. Не копируй фразы из отзыва дословно
 9. Не используй штампы: «Спасибо за обратную связь», «Будем рады видеть вас снова»
+10. НЕ добавляй подпись («С уважением», «Команда» и т.п.) — она будет добавлена автоматически
 
-СТРУКТУРА: [Имя + приветствие] → [Суть с названием товара] → [Конкретный шаг] → [Подпись]"""
+СТРУКТУРА: [Имя + приветствие] → [Суть с названием товара] → [Конкретный шаг]"""
 
     if good:
         p += "\n\nПРИМЕРЫ ОДОБРЕННЫХ ОТВЕТОВ (воспроизводи стиль):"
@@ -275,8 +284,10 @@ async def api_generate(request: Request):
         f"{review_text}"
     )
 
-    provider = settings.get("provider", "openai")
-    model    = settings.get("model", "")
+    provider  = settings.get("provider", "openai")
+    model     = settings.get("model", "")
+    brand     = settings.get("brandName", "бренда")
+    signature = (settings.get("signature") or f"Команда {brand}").strip()
 
     try:
         if provider == "gemini":
@@ -286,7 +297,7 @@ async def api_generate(request: Request):
                 base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
             )
             resp = client.chat.completions.create(
-                model=model or os.getenv("GEMINI_MODEL", "gemini-2.0-flash"),
+                model=model or os.getenv("GEMINI_MODEL", "gemini-2.5-flash"),
                 max_tokens=500,
                 temperature=0.7,
                 messages=[
@@ -321,6 +332,7 @@ async def api_generate(request: Request):
             )
             text = resp.choices[0].message.content.strip()
 
+        text = append_signature(text, signature)
         return JSONResponse({"ok": True, "text": text})
 
     except Exception as e:
