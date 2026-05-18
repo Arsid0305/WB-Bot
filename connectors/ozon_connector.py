@@ -74,7 +74,8 @@ def get_unanswered_feedbacks(take: int = 100, skip: int = 0) -> list[dict]:
         json={"status": "UNPROCESSED", "limit": min(max(take, 20), 100), "sort_dir": "DESC"},
         timeout=30,
     )
-    resp.raise_for_status()
+    if not resp.ok:
+        raise Exception(f"{resp.status_code}: {resp.text[:300]}")
     reviews_raw = resp.json().get("reviews", [])
 
     if not reviews_raw:
