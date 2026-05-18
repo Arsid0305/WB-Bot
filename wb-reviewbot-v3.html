@@ -589,9 +589,9 @@ function App(){
     setLoading(true);setPlatformError(null);
     try{
       const data=await apiFetch(theme.apiPath);
-      const existingIds=new Set(reviews.map(r=>r.id));
-      const newOnes=data.reviews.filter(r=>!existingIds.has(r.id));
-      const merged=[...newOnes.map(r=>({...r,source:theme.platform,platform:theme.platform})),...reviews];
+      const manual=reviews.filter(r=>r.source==="manual");
+      const fresh=data.reviews.map(r=>({...r,source:theme.platform,platform:theme.platform}));
+      const merged=[...fresh,...manual];
       setReviews(merged);LS.set("wb_reviews_local",merged);
       if(data.count===0)setPlatformError("Новых неотвеченных отзывов нет");
     }catch(e){setPlatformError(e.message);}
