@@ -13,6 +13,9 @@ cd /d C:\DATA\PROJECTS\WB-Bot
 
 call venv\Scripts\activate.bat
 
+echo  Обновление из GitHub...
+git pull origin main --quiet && echo   OK || echo   Нет интернета, работаем с локальной версией
+
 echo  Token check...
 python -c "from dotenv import load_dotenv; import os, requests; load_dotenv(); t=os.getenv('WB_TOKEN','').strip(); r=requests.get('https://feedbacks-api.wildberries.ru/api/v1/feedbacks',headers={'Authorization':f'Bearer {t}'},params={'isAnswered':'false','take':1,'skip':0},timeout=15); print('  Token: OK' if r.status_code==200 else f'  Token: ERROR {r.status_code}')" 2>nul || echo   Token check skipped
 
