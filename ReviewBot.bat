@@ -14,6 +14,7 @@ cd /d C:\DATA\PROJECTS\WB-Bot
 call venv\Scripts\activate.bat
 
 echo  Обновление из GitHub...
+del /f /q "%CD%\ReviewBot.ico" 2>nul
 git pull origin main --quiet && echo   OK || echo   Нет интернета, работаем с локальной версией
 git checkout ReviewBot.ico 2>nul
 
