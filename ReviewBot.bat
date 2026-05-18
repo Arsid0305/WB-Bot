@@ -9,7 +9,7 @@ echo   ReviewBot WB
 echo  ==========================================
 echo.
 
-cd /d C:\DATA\PROJECTS\WB-Bot
+cd /d "%~dp0"
 
 if not exist venv (
     echo  Создание виртуальной среды...
