@@ -2,9 +2,8 @@ name: Auto-merge feature branches
 
 on:
   push:
-    branches-ignore:
-      - main
-      - dev
+    branches:
+      - 'claude/**'
 
 permissions:
   contents: write

@@ -395,6 +395,46 @@ async def api_ozon_send_reply(request: Request):
         return JSONResponse({"ok": False, "error": msg}, status_code=502)
 
 
+@app.post("/regenerate")
+def regenerate(index: int = Form(...)):
+    queue = load_queue()
+    if index < 0 or index >= len(queue):
+        return RedirectResponse("/", status_code=303)
+
+    item   = queue[index]
+    review = item.get("review", {})
+    first_name = extract_first_name(review.get("author", ""))
+    feedback_history = load_feedback_history()
+
+    default_settings = {"brandName": "Наш бренд", "tone": "friendly", "responseLength": "medium", "signature": ""}
+    system_prompt = build_system_prompt(default_settings, feedback_history)
+    user_prompt = (
+        f"Товар: «{review.get('productName', '—')}» (арт. {review.get('article', '—')})\n"
+        f"Оценка: {review.get('stars', 0)} из 5★\n"
+        f"Имя покупателя: {review.get('author', '—')} → обращайся: «{first_name}»\n"
+        f"{build_review_text(review)}"
+    )
+
+    try:
+        from openai import OpenAI
+        client = OpenAI(api_key=os.getenv("OPENAI_API_KEY_REVIEWBOT"))
+        resp = client.chat.completions.create(
+            model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
+            max_tokens=500,
+            temperature=0.7,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user",   "content": user_prompt},
+            ],
+        )
+        queue[index]["response"] = resp.choices[0].message.content.strip()
+        save_queue(queue)
+    except Exception:
+        pass
+
+    return RedirectResponse("/", status_code=303)
+
+
 @app.get("/api/feedback/stats")
 def api_feedback_stats():
     history = load_feedback_history()
