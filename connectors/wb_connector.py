@@ -2,6 +2,23 @@
 import os
 import requests
 from datetime import datetime
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception
+
+
+def _is_transient(exc: BaseException) -> bool:
+    if isinstance(exc, (requests.exceptions.ConnectionError, requests.exceptions.Timeout)):
+        return True
+    if isinstance(exc, requests.exceptions.HTTPError):
+        return exc.response is not None and exc.response.status_code >= 500
+    return False
+
+
+_retry = retry(
+    retry=retry_if_exception(_is_transient),
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=2, min=2, max=16),
+    reraise=True,
+)
 
 BASE_URL = "https://feedbacks-api.wildberries.ru"
 
@@ -29,6 +46,7 @@ def _parse_bables(fb: dict) -> str:
     return ", ".join(n for n in names if n)
 
 
+@_retry
 def get_unanswered_feedbacks(take: int = 100, skip: int = 0) -> list[dict]:
     resp = requests.get(
         f"{BASE_URL}/api/v1/feedbacks",
@@ -92,6 +110,7 @@ def get_unanswered_feedbacks(take: int = 100, skip: int = 0) -> list[dict]:
     return result
 
 
+@_retry
 def send_reply(feedback_id: str, text: str) -> bool:
     resp = requests.patch(
         f"{BASE_URL}/api/v1/feedbacks/answer",

@@ -2,6 +2,23 @@
 import os
 import requests
 from datetime import datetime
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception
+
+
+def _is_transient(exc: BaseException) -> bool:
+    if isinstance(exc, (requests.exceptions.ConnectionError, requests.exceptions.Timeout)):
+        return True
+    if isinstance(exc, requests.exceptions.HTTPError):
+        return exc.response is not None and exc.response.status_code >= 500
+    return False
+
+
+_retry = retry(
+    retry=retry_if_exception(_is_transient),
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=2, min=2, max=16),
+    reraise=True,
+)
 
 BASE_URL = "https://api-seller.ozon.ru"
 
@@ -63,10 +80,12 @@ def _get_product_info(skus: list) -> dict:
                         }
         return result
 
-    except Exception:
+    except Exception as e:
+        print(f"[ozon] _get_product_info error: {e}")
         return {}
 
 
+@_retry
 def get_unanswered_feedbacks(take: int = 100, skip: int = 0) -> list[dict]:
     resp = requests.post(
         f"{BASE_URL}/v1/review/list",
@@ -140,10 +159,12 @@ def _change_status(review_ids: list, status: str = "PROCESSED") -> bool:
             timeout=15,
         )
         return resp.ok
-    except Exception:
+    except Exception as e:
+        print(f"[ozon] _change_status error: {e}")
         return False
 
 
+@_retry
 def send_reply(feedback_id: str, text: str) -> bool:
     for payload in [
         {"review_id": feedback_id, "text": text},
