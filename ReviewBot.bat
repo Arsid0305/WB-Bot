@@ -21,10 +21,7 @@ if not exist "%CD%\ReviewBot.ico" (
   python make_icon.py 2>nul && echo   OK
 )
 
-if not exist "%USERPROFILE%\Desktop\ReviewBot WB.lnk" (
-  echo  Создаю ярлык на рабочем столе...
-  powershell -NoProfile -Command "$s=(New-Object -COM WScript.Shell).CreateShortcut('%USERPROFILE%\Desktop\ReviewBot WB.lnk');$s.TargetPath='%CD%\ReviewBot.bat';$s.IconLocation='%CD%\ReviewBot.ico';$s.WorkingDirectory='%CD%';$s.Save()" && echo   OK
-)
+powershell -NoProfile -Command "$d=[Environment]::GetFolderPath('Desktop');$lnk=$d+'\ReviewBot WB.lnk';if(!(Test-Path $lnk)){$s=(New-Object -COM WScript.Shell).CreateShortcut($lnk);$s.TargetPath='%CD%\ReviewBot.bat';$s.IconLocation='%CD%\ReviewBot.ico,0';$s.WorkingDirectory='%CD%';$s.Save();Write-Host '  Ярлык создан на рабочем столе'}"
 
 echo  Token check...
 python -c "from dotenv import load_dotenv; import os, requests; load_dotenv(); t=os.getenv('WB_TOKEN','').strip(); r=requests.get('https://feedbacks-api.wildberries.ru/api/v1/feedbacks',headers={'Authorization':f'Bearer {t}'},params={'isAnswered':'false','take':1,'skip':0},timeout=15); print('  Token: OK' if r.status_code==200 else f'  Token: ERROR {r.status_code}')" 2>nul || echo   Token check skipped
