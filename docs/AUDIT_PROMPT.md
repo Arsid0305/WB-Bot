@@ -10,7 +10,7 @@
 Аудит на устаревшем snapshot бесполезен. До чтения кода:
 1. Прочитать последние 10 коммитов: `git log --oneline -10 main`
 2. Зафиксировать HEAD: `git rev-parse main` — указать SHA в начале отчёта
-3. Пробежать по `tasks/lessons.md` и `git log --grep=fix` за последний месяц — не повторять уже починенное
+3. Пробежать по `tasks/lessons.md` и `git log --grep=fix` за последний месяц — не повторять уже починённое
 
 Если найден баг — убедиться что он **есть в текущем HEAD**, а не в кеше.
 
@@ -27,7 +27,7 @@ AI-провайдеры: openai, anthropic, gemini, deepseek — все в web/a
 Внешние API: Wildberries API, Ozon API (через коннекторы), AI-провайдеры
 
 CI/CD: automerge.yml (claude/** и cursor/** → main напрямую)
-После push: syntax check + check_consistency.py → merge в main
+После push: syntax check + check_consistency.py → merge в main → удаление ветки
 
 SSOT этого проекта:
   AI-провайдеры    → web/app.py:api_generate() (список: openai, anthropic, gemini, deepseek)
@@ -44,7 +44,7 @@ SSOT этого проекта:
 - rate limiting и abuse prevention (нет публичного деплоя)
 - GDPR / compliance
 - Docker / Kubernetes / horizontal scaling
-- §9 НАБЛЮДАЕМОСТЬ — нет отдельного runtime monitoring
+- §9 НАБЛЮДАЕМОСТЬ — нет runtime monitoring
 
 ---
 
@@ -95,6 +95,7 @@ SSOT: `web/app.py:api_generate()` (список провайдеров), `autome
 - [ ] `check_consistency.py` запускается в CI до merge
 - [ ] При конфликте мержа — abort + exit 1, не зависает
 - [ ] Нет `--no-verify`, нет force push в main
+- [ ] Ветка удаляется автоматически после мержа (`--delete`)
 
 ### 5. ДОКУМЕНТАЦИЯ vs РЕАЛЬНОСТЬ
 
