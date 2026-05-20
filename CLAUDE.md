@@ -112,7 +112,7 @@ git clone https://github.com/Arsid0305/TEMPLATE /tmp/arsid-template
 - [ ] `.env` в `.gitignore`, не попал в историю git
 - [ ] Секреты не выводятся через `print` или в логах
 
-### Безопасность Flask
+### Безопасность FastAPI
 - [ ] `debug=False` в продакшен-режиме
 - [ ] Входные данные валидируются до передачи во внешние запросы
 - [ ] Нет command injection в shell-вызовах
@@ -126,16 +126,29 @@ git clone https://github.com/Arsid0305/TEMPLATE /tmp/arsid-template
 ## Инфраструктура
 
 - Репо: github.com/Arsid0305/WB-Bot
-- Бэкенд: Python / Flask
-- Фронтенд: HTML/JS (web/templates + web/static)
-- Стек: Python 3 + Flask, `connectors/wb_connector.py`, `connectors/ozon_connector.py`
+- Бэкенд: Python / FastAPI (`web/app.py`)
+- Фронтенд: статический HTML (`wb-reviewbot-v3.html`)
+- Коннекторы: `connectors/wb_connector.py`, `connectors/ozon_connector.py`
+
+---
+
+## AI-провайдеры
+
+SSOT: `web/app.py`, функция `api_generate()`. Поддерживаемые провайдеры:
+
+- `openai`
+- `anthropic`
+- `gemini`
+- `deepseek`
+
+Везде где провайдеры упомянуты — должно совпадать с этим списком.
 
 ---
 
 ## Рабочий процесс
 
 1. Claude пишет код → пушит в `claude/...`
-2. `automerge.yml` → `dev`, `promote.yml` → `main`
+2. `automerge.yml` → `main` (напрямую, без dev-стейджа)
 3. Тестируем
 
 **Правило:** спросить «Мержить в main?» и ждать ответа.
@@ -144,7 +157,7 @@ git clone https://github.com/Arsid0305/TEMPLATE /tmp/arsid-template
 
 ## Правила Git
 
-- Разрабатывать на `claude/...`, никогда не пушить напрямую в `main`
+- Разрабатывать на `claude/...` или `cursor/...`, никогда не пушить напрямую в `main`
 - Никогда не использовать `--no-verify`, `--force`, `--no-gpg-sign`
 
 ---
