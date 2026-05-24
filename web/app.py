@@ -42,6 +42,24 @@ SIGNATURE = "\n\nС уважением,\nкоманда Arols"
 
 _bearer = HTTPBearer(auto_error=False)
 
+# Символы управления (нуль-байт, ESC, DEL и др.), но не \t \n \r
+_CTRL_RE = re.compile(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]')
+
+
+def _sanitize_line(value: str) -> str:
+    """Однострочное поле: убирает переносы строк и управляющие символы, сматывает пробелы."""
+    value = _CTRL_RE.sub('', value)
+    value = re.sub(r'[\r\n\t]+', ' ', value)
+    return ' '.join(value.split())
+
+
+def _sanitize_multiline(value: str) -> str:
+    """Многострочное поле: убирает управляющие символы, нормализует переносы строк, ограничивает подряд пустых строк."""
+    value = _CTRL_RE.sub('', value)
+    value = re.sub(r'\r\n?', '\n', value)
+    value = re.sub(r'\n{3,}', '\n\n', value)
+    return value.strip()
+
 
 def _check_write_token(
     creds: Optional[HTTPAuthorizationCredentials] = Depends(_bearer),
@@ -163,10 +181,10 @@ def build_system_prompt(settings: dict, feedback_history: list) -> str:
         "long":   "500-900 символов — развёрнуто",
     }
 
-    brand  = settings.get("brandName") or "Наш бренд"
+    brand  = _sanitize_line(settings.get("brandName") or "Наш бренд")
     tone   = tone_map.get(settings.get("tone", "friendly"), tone_map["friendly"])
     length = len_map.get(settings.get("responseLength", "medium"), len_map["medium"])
-    extra  = settings.get("customInstructions") or ""
+    extra  = _sanitize_multiline(settings.get("customInstructions") or "")
 
     p = f"""Ты — специалист по работе с клиентами на маркетплейсе Wildberries. Пишешь ответы на отзывы покупателей от лица бренда.
 
@@ -199,7 +217,9 @@ def build_system_prompt(settings: dict, feedback_history: list) -> str:
     if bad:
         p += "\n\nЧЕГО СТРОГО ИЗБЕГАТЬ:"
         for ex in bad:
-            p += f"\n- {ex.get('note')}"
+            note = _sanitize_line(str(ex.get('note') or ''))
+            if note:
+                p += f"\n- {note}"
 
     p += "\n\nОтвечай ТОЛЬКО текстом ответа, без кавычек и пояснений."
     return p
@@ -286,8 +306,8 @@ async def api_generate(
 
     provider  = settings.provider
     model     = settings.model
-    brand     = settings.brandName or "бренда"
-    signature = (settings.signature or f"Команда {brand}").strip()
+    brand     = _sanitize_line(settings.brandName or "бренда")
+    signature = _sanitize_line(settings.signature or f"Команда {brand}")
 
     try:
         if provider == "gemini":
