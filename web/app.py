@@ -1,7 +1,10 @@
-from fastapi import FastAPI, Request
+import logging
+from typing import Optional
+from fastapi import FastAPI, Request, Depends, HTTPException
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 import json
 import os
 import re
@@ -18,6 +21,8 @@ _DATA_DIR = _BOT_DIR
 
 FEEDBACK_FILE = _DATA_DIR / "wb_feedback_history.json"
 
+logger = logging.getLogger(__name__)
+
 app = FastAPI()
 
 app.add_middleware(
@@ -25,17 +30,28 @@ app.add_middleware(
     allow_origins=[
         "http://127.0.0.1:8000",
         "http://localhost:8000",
-        "null",  # file:// protocol sends Origin: null
     ],
     allow_credentials=False,
     allow_methods=["GET", "POST"],
-    allow_headers=["Content-Type"],
+    allow_headers=["Content-Type", "Authorization"],
 )
 
 app.mount("/static", StaticFiles(directory=str(_APP_DIR / "static")), name="static")
 
 SIGNATURE = "\n\nС уважением,\nкоманда Arols"
 
+_bearer = HTTPBearer(auto_error=False)
+
+
+def _check_write_token(
+    creds: Optional[HTTPAuthorizationCredentials] = Depends(_bearer),
+) -> None:
+    """Require bearer token on write endpoints when WEB_API_TOKEN is configured."""
+    token = os.getenv("WEB_API_TOKEN", "").strip()
+    if not token:
+        return  # token not configured → open access (backwards compat)
+    if creds is None or creds.credentials != token:
+        raise HTTPException(status_code=401, detail="Требуется авторизация")
 
 
 def load_feedback_history():
@@ -49,15 +65,21 @@ def load_feedback_history():
 
 def save_feedback_history(data):
     tmp = FEEDBACK_FILE.with_suffix(".tmp")
-    tmp.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
-    tmp.replace(FEEDBACK_FILE)
-
+    try:
+        tmp.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+        tmp.replace(FEEDBACK_FILE)
+    except OSError as exc:
+        logger.error("save_feedback_history failed: %s", exc)
+        try:
+            tmp.unlink(missing_ok=True)
+        except OSError:
+            pass
+        raise
 
 
 def append_signature(text: str, signature: str) -> str:
-    # Strip any signature the model might have added anyway
     text = re.sub(
-        r'\s*(С уважением|Искренне ваш[а]?|Команда\s+\S+)[^\n]*$',
+        r'\s*(С уважением|Искренне ваш[a-zA-Zа-яеё]?|Команда\s+\S+)[^\n]*$',
         '', text, flags=re.IGNORECASE
     ).rstrip()
     return text + "\n" + signature
@@ -139,7 +161,6 @@ def build_system_prompt(settings: dict, feedback_history: list) -> str:
     return p
 
 
-
 @app.get("/favicon.ico", include_in_schema=False)
 def favicon():
     return FileResponse(str(_APP_DIR / "static" / "favicon.ico"))
@@ -172,7 +193,10 @@ def api_get_reviews(take: int = 100, skip: int = 0):
 
 
 @app.post("/api/wb/send")
-async def api_send_reply(request: Request):
+async def api_send_reply(
+    request: Request,
+    _: None = Depends(_check_write_token),
+):
     body = await request.json()
     feedback_id = body.get("feedback_id")
     text = body.get("text", "").strip()
@@ -196,7 +220,10 @@ async def api_send_reply(request: Request):
 
 
 @app.post("/api/generate")
-async def api_generate(request: Request):
+async def api_generate(
+    request: Request,
+    _: None = Depends(_check_write_token),
+):
     body = await request.json()
     review   = body.get("review", {})
     settings = body.get("settings", {})
@@ -294,11 +321,15 @@ async def api_generate(request: Request):
             return JSONResponse({"ok": False, "error": f"Неверный API-ключ ({provider})"}, status_code=401)
         if "insufficient_quota" in msg:
             return JSONResponse({"ok": False, "error": "Недостаточно средств на счёте"}, status_code=402)
-        return JSONResponse({"ok": False, "error": msg}, status_code=500)
+        logger.error("api_generate error (provider=%s): %s", provider, msg)
+        return JSONResponse({"ok": False, "error": "Внутренняя ошибка сервера"}, status_code=500)
 
 
 @app.post("/api/feedback")
-async def api_save_feedback(request: Request):
+async def api_save_feedback(
+    request: Request,
+    _: None = Depends(_check_write_token),
+):
     body = await request.json()
     history = load_feedback_history()
     history.append({
@@ -312,7 +343,10 @@ async def api_save_feedback(request: Request):
     })
     if len(history) > 200:
         history = history[-200:]
-    save_feedback_history(history)
+    try:
+        save_feedback_history(history)
+    except OSError:
+        return JSONResponse({"ok": False, "error": "Не удалось сохранить историю"}, status_code=500)
     return JSONResponse({"ok": True, "total": len(history)})
 
 
@@ -337,7 +371,10 @@ def api_ozon_get_reviews(take: int = 100, skip: int = 0):
 
 
 @app.post("/api/ozon/send")
-async def api_ozon_send_reply(request: Request):
+async def api_ozon_send_reply(
+    request: Request,
+    _: None = Depends(_check_write_token),
+):
     body = await request.json()
     feedback_id = body.get("feedback_id")
     text = body.get("text", "").strip()
@@ -354,7 +391,6 @@ async def api_ozon_send_reply(request: Request):
         if "401" in msg:
             return JSONResponse({"ok": False, "error": "Ozon токен недействителен"}, status_code=401)
         return JSONResponse({"ok": False, "error": msg}, status_code=502)
-
 
 
 @app.get("/api/feedback/stats")
