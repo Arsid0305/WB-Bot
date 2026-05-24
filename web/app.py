@@ -1,14 +1,14 @@
 import logging
-from typing import Optional
-from fastapi import FastAPI, Request, Depends, HTTPException
+from typing import Optional, Literal
+from fastapi import FastAPI, Depends, HTTPException
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from pydantic import BaseModel, Field
 import json
 import os
 import re
-import sys
 import requests
 from datetime import datetime
 from pathlib import Path
@@ -46,13 +46,58 @@ _bearer = HTTPBearer(auto_error=False)
 def _check_write_token(
     creds: Optional[HTTPAuthorizationCredentials] = Depends(_bearer),
 ) -> None:
-    """Require bearer token on write endpoints when WEB_API_TOKEN is configured."""
     token = os.getenv("WEB_API_TOKEN", "").strip()
     if not token:
-        return  # token not configured → open access (backwards compat)
+        return
     if creds is None or creds.credentials != token:
         raise HTTPException(status_code=401, detail="Требуется авторизация")
 
+
+# ---------------------------------------------------------------------------
+# Pydantic-модели запросов
+# ---------------------------------------------------------------------------
+
+class SendReplyIn(BaseModel):
+    feedback_id: str = Field(..., min_length=1, max_length=100)
+    text: str = Field(..., min_length=1, max_length=1000)
+
+
+class ReviewIn(BaseModel):
+    productName: str = Field("", max_length=500)
+    article: str = Field("", max_length=100)
+    stars: int = Field(5, ge=1, le=5)
+    author: str = Field("", max_length=200)
+    pros: str = Field("", max_length=2000)
+    cons: str = Field("", max_length=2000)
+    comment: str = Field("", max_length=5000)
+
+
+class SettingsIn(BaseModel):
+    provider: Literal["openai", "gemini", "anthropic", "deepseek"] = "openai"
+    model: str = Field("", max_length=100)
+    brandName: str = Field("", max_length=200)
+    tone: Literal["neutral", "friendly", "creative"] = "friendly"
+    responseLength: Literal["short", "medium", "long"] = "medium"
+    signature: Optional[str] = Field(None, max_length=200)
+    customInstructions: Optional[str] = Field(None, max_length=1000)
+
+
+class GenerateIn(BaseModel):
+    review: ReviewIn = Field(default_factory=ReviewIn)
+    settings: SettingsIn = Field(default_factory=SettingsIn)
+
+
+class FeedbackIn(BaseModel):
+    reviewText: str = Field("", max_length=5000)
+    response: str = Field("", max_length=2000)
+    stars: int = Field(0, ge=0, le=5)
+    rating: Optional[int] = Field(None, ge=1, le=5)
+    note: Optional[str] = Field(None, max_length=1000)
+
+
+# ---------------------------------------------------------------------------
+# Вспомогательные функции
+# ---------------------------------------------------------------------------
 
 def load_feedback_history():
     if not FEEDBACK_FILE.exists():
@@ -118,11 +163,10 @@ def build_system_prompt(settings: dict, feedback_history: list) -> str:
         "long":   "500-900 символов — развёрнуто",
     }
 
-    brand  = settings.get("brandName", "Наш бренд")
+    brand  = settings.get("brandName") or "Наш бренд"
     tone   = tone_map.get(settings.get("tone", "friendly"), tone_map["friendly"])
     length = len_map.get(settings.get("responseLength", "medium"), len_map["medium"])
-    sign   = settings.get("signature") or f"Команда {brand}"
-    extra  = settings.get("customInstructions", "")
+    extra  = settings.get("customInstructions") or ""
 
     p = f"""Ты — специалист по работе с клиентами на маркетплейсе Wildberries. Пишешь ответы на отзывы покупателей от лица бренда.
 
@@ -161,6 +205,10 @@ def build_system_prompt(settings: dict, feedback_history: list) -> str:
     return p
 
 
+# ---------------------------------------------------------------------------
+# Эндпоинты
+# ---------------------------------------------------------------------------
+
 @app.get("/favicon.ico", include_in_schema=False)
 def favicon():
     return FileResponse(str(_APP_DIR / "static" / "favicon.ico"))
@@ -194,21 +242,12 @@ def api_get_reviews(take: int = 100, skip: int = 0):
 
 @app.post("/api/wb/send")
 async def api_send_reply(
-    request: Request,
+    body: SendReplyIn,
     _: None = Depends(_check_write_token),
 ):
-    body = await request.json()
-    feedback_id = body.get("feedback_id")
-    text = body.get("text", "").strip()
-
-    if not feedback_id or not text:
-        return JSONResponse({"ok": False, "error": "feedback_id и text обязательны"}, status_code=400)
-    if len(text) > 1000:
-        return JSONResponse({"ok": False, "error": f"Текст превышает 1000 символов ({len(text)})"}, status_code=400)
-
     try:
         from connectors.wb_connector import send_reply
-        send_reply(feedback_id, text)
+        send_reply(body.feedback_id, body.text)
         return JSONResponse({"ok": True})
     except requests.HTTPError as e:
         code = e.response.status_code if e.response is not None else 0
@@ -221,36 +260,34 @@ async def api_send_reply(
 
 @app.post("/api/generate")
 async def api_generate(
-    request: Request,
+    body: GenerateIn,
     _: None = Depends(_check_write_token),
 ):
-    body = await request.json()
-    review   = body.get("review", {})
-    settings = body.get("settings", {})
+    review   = body.review
+    settings = body.settings
 
-    review_text      = build_review_text(review)
-    first_name       = extract_first_name(review.get("author", ""))
+    review_text      = build_review_text(review.model_dump())
+    first_name       = extract_first_name(review.author)
     feedback_history = load_feedback_history()
 
-    stars = review.get("stars", 5)
-    effective_settings = dict(settings)
-    if stars <= 2:
+    effective_settings = settings.model_dump()
+    if review.stars <= 2:
         effective_settings["responseLength"] = "long"
-    elif stars == 3 and settings.get("responseLength") == "short":
+    elif review.stars == 3 and settings.responseLength == "short":
         effective_settings["responseLength"] = "medium"
 
-    system_prompt    = build_system_prompt(effective_settings, feedback_history)
+    system_prompt = build_system_prompt(effective_settings, feedback_history)
     user_prompt = (
-        f"Товар: «{review.get('productName', '—')}» (арт. {review.get('article', '—')})\n"
-        f"Оценка: {review.get('stars', 0)} из 5★\n"
-        f"Имя покупателя: {review.get('author', '—')} → обращайсь: «{first_name or 'без обращения'}»\n"
+        f"Товар: «{review.productName or '—'}» (арт. {review.article or '—'})\n"
+        f"Оценка: {review.stars} из 5★\n"
+        f"Имя покупателя: {review.author or '—'} → обращайсь: «{first_name or 'без обращения'}»\n"
         f"<customer_review>\n{review_text}\n</customer_review>"
     )
 
-    provider  = settings.get("provider", "openai")
-    model     = settings.get("model", "")
-    brand     = settings.get("brandName", "бренда")
-    signature = (settings.get("signature") or f"Команда {brand}").strip()
+    provider  = settings.provider
+    model     = settings.model
+    brand     = settings.brandName or "бренда"
+    signature = (settings.signature or f"Команда {brand}").strip()
 
     try:
         if provider == "gemini":
@@ -327,18 +364,17 @@ async def api_generate(
 
 @app.post("/api/feedback")
 async def api_save_feedback(
-    request: Request,
+    body: FeedbackIn,
     _: None = Depends(_check_write_token),
 ):
-    body = await request.json()
     history = load_feedback_history()
     history.append({
         "id":         int(datetime.now().timestamp() * 1000),
-        "reviewText": body.get("reviewText", ""),
-        "response":   body.get("response", ""),
-        "stars":      body.get("stars", 0),
-        "rating":     body.get("rating"),
-        "note":       body.get("note"),
+        "reviewText": body.reviewText,
+        "response":   body.response,
+        "stars":      body.stars,
+        "rating":     body.rating,
+        "note":       body.note,
         "ts":         datetime.now().isoformat(),
     })
     if len(history) > 200:
@@ -366,25 +402,17 @@ def api_ozon_get_reviews(take: int = 100, skip: int = 0):
         reviews = get_unanswered_feedbacks(take=take, skip=skip)
         return JSONResponse({"ok": True, "reviews": reviews, "count": len(reviews)})
     except Exception as e:
-        msg = str(e)
-        return JSONResponse({"ok": False, "error": msg}, status_code=502)
+        return JSONResponse({"ok": False, "error": str(e)}, status_code=502)
 
 
 @app.post("/api/ozon/send")
 async def api_ozon_send_reply(
-    request: Request,
+    body: SendReplyIn,
     _: None = Depends(_check_write_token),
 ):
-    body = await request.json()
-    feedback_id = body.get("feedback_id")
-    text = body.get("text", "").strip()
-
-    if not feedback_id or not text:
-        return JSONResponse({"ok": False, "error": "feedback_id и text обязательны"}, status_code=400)
-
     try:
         from connectors.ozon_connector import send_reply
-        send_reply(feedback_id, text)
+        send_reply(body.feedback_id, body.text)
         return JSONResponse({"ok": True})
     except Exception as e:
         msg = str(e)
