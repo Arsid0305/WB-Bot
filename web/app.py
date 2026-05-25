@@ -30,6 +30,7 @@ app.add_middleware(
     allow_origins=[
         "http://127.0.0.1:8000",
         "http://localhost:8000",
+        "null",  # file:// протокол: ReviewBot.bat открывает HTML напрямую из файловой системы
     ],
     allow_credentials=False,
     allow_methods=["GET", "POST"],

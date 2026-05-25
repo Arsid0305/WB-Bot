@@ -14,9 +14,19 @@ cd /d "%~dp0"
 if not exist venv (
     echo  Создание виртуальной среды...
     python -m venv venv
+    if errorlevel 1 (
+        echo  WARN: Не удалось создать venv, используем системный Python
+        goto :skip_activate
+    )
 )
 
-call venv\Scripts\activate.bat
+if exist venv\Scripts\activate.bat (
+    call venv\Scripts\activate.bat
+) else (
+    echo  WARN: venv не полный, используем системный Python
+)
+
+:skip_activate
 
 echo  Обновление из GitHub...
 git fetch origin main --quiet 2>nul
